@@ -21,7 +21,16 @@ The main components are:
 * A Streamlit dashboard illustrating how transactions and fraud predictions can be visualized using Python and SQL
 * Hazelcast Management Center
 
+# Clone this Repo
+```
+git clone https://github.com/hazelcast/fraud-detection-python.git
+cd fraud-detection-python
+```
+
+
 # STEP 1: Set up Your Kubernetes Cluster 
+
+
 Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. You can use any Kubernetes service provider. We will use Google Kubernetes Engine (GKE) in this setup
 
 In GKE, create a cluster named `hz-fraud-detection-python`. Ensure your cluster has 4 nodes with at least 8 VCPUs and 8GB memory each.
