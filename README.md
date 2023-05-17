@@ -22,14 +22,16 @@ The main components are:
 * Hazelcast Management Center
 
 # STEP 1: Set up Your Kubernetes Cluster 
-Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. You can use any Kubernetes service provider. 
+Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. You can use any Kubernetes service provider. We will use Google Kubernetes Engine (GKE) in this setup
 
-In GKE, create a cluster named `hz-fraud-detection-python`. Once created, you can point `kubectl` to it by running
+In GKE, create a cluster named `hz-fraud-detection-python`. Ensure your cluster has 4 nodes with at least 8 VCPUs and 8GB memory each.
+
+Once created, you can point `kubectl` to it by running
 ```
 gcloud container clusters get-credentials hz-fraud-detection-python --zone europe-west2-a --project <your-gke-project>
 ```
 
-## Deploy a 3-node Hazelcast cluster, Management Center, Fraud Dashboard and Data loaders
+## Deploy a Management Center, Fraud Dashboard, Data loaders and a 3-node Hazelcast cluster 
 First, prepare your Kubernetes cluster with
 ```
 kubectl apply -f https://raw.githubusercontent.com/hazelcast/hazelcast-kubernetes/master/rbac.yaml
@@ -37,22 +39,19 @@ helm repo add hazelcast https://hazelcast-charts.s3.amazonaws.com/
 helm repo update
 ```
 
-Finally, deploy your Hazelcast cluster with
+Finally, deploy all components with
 ```
 helm install -f values.yaml hz-python hazelcast/hazelcast 
 kubectl apply -f hz-pods.yaml
 ```
 
-Wait 3-5 minutes and ALL your PODS should be RUNNING
+Wait 3-5 minutes and ALL 6 PODS should be RUNNING
 ```
 kubectl get pods
 ```
 The output should be similar to
 ![kubectl get pods](./images/pods.png)
 
-Make sure to make a note of the EXTERNAL-IP for the following PODS
-* hz-python-hazelcast-mancenter-0 (in the above example "34.89.44.29:8080")
-* fraud-dashboard (in the above example "34.105.167.221:8501")
 
 # STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
 Open a second Terminal window
@@ -81,8 +80,7 @@ kubectl get services
 You should see the following SERVICES available
 ![kubectl get services](./images/services.png)
 
-Make a note of the EXTERNAL-IP for your Hazelcast cluster
-Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
+Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
 
 Set an environment variable
 ```
@@ -113,7 +111,7 @@ Go back to your Data loader Terminal Window
 python transaction-data-loader.py transaction-stream-full.csv 
 ```
 
-# STEP 5: Monitor your Inference PIpeline in Management Center
+# STEP 5: Monitor your Inference Pipeline in Management Center
 Go back to your main Terminal Window
 
 Let's grab your management center IP address
@@ -123,8 +121,7 @@ kubectl get services
 You should see the following SERVICES available
 ![kubectl get services](./images/services.png)
 
-Make a note of the EXTERNAL-IP for your management center
-Look for the `hz-python-hazelcast-mancenter` service. 
+Make a note of the EXTERNAL-IP for your management center. Look for the `hz-python-hazelcast-mancenter` service. 
 In this example, it is `34.89.44.29:8080`
 
 Open a Browser to this location
@@ -137,8 +134,7 @@ Your Inference pipeline should be processsing transactions
 # STEP 6: Let's Visualize transactions and their fraud predictions
 Go back your main terminal window
 
-Make a note of the EXTERNAL-IP for your fraud dashboard service
-Look for the `fraud-dashboard` service. 
+Make a note of the EXTERNAL-IP for your fraud dashboard service. Look for the `fraud-dashboard` service. 
 In this example, it is `34.105.167.221:8501`
 
 Open a Browser to this location
