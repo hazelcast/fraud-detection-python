@@ -16,7 +16,7 @@ In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast.
 The main components are:
 * A Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
 * A customer and merchant data loader program (written in Python) showing how to load data into Hazelcast (distributed in-memory data store)
-* A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of transaction processing steps to be applied as transactions come into Hazelcast
+* A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of steps to determine if an incoming transaction is potentially fraudulent. 
 * A Python transaction loader program similuating transactions being sent to Hazelcast
 * A Streamlit dashboard illustrating how transactions and fraud predictions can be visualized using Python and SQL
 * Hazelcast Management Center
