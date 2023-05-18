@@ -168,7 +168,9 @@ helm delete hz-python
 kubectl delete -f hz-pods.yaml
 ```
 
-Finally, DON'T FORGET TO DELETE YOUR KUBERNETES CLUSTER!
+Finally, 
+# DON'T FORGET TO DELETE YOUR KUBERNETES CLUSTER!
+to avoid unnecesary Cloud bills!
 
 
 
