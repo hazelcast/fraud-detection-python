@@ -112,7 +112,7 @@ Broadly speaking, the pipeline
 * Looks up the relevant customer and merchant from the credit card and merchant code provided in the transaction
 * Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored in the Customer Map in Hazelcast
 * Runs the LightGBM model passing the required input data (transformed )
-* Stores the predicted returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory). 
+* Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory). 
 
 # STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
 Go back to your Data loader Terminal Window
