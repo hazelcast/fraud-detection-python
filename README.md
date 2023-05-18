@@ -117,7 +117,7 @@ Broadly speaking, the pipeline
 # STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
 Go back to your Data loader Terminal Window
 ```
-python transaction-data-loader.py transaction-stream-full.csv 
+python transaction-data-loader.py data/transaction-stream-full.csv
 ```
 
 # STEP 5: Monitor your Inference Pipeline in Management Center
