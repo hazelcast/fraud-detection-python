@@ -93,7 +93,7 @@ Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-pyth
 
 Set an environment variable
 ```
-export HZ_ENDPOINT=<your-hz-python-hz-service-ip>:5701
+export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
 ```
 
 Now you can deploy the real-time inference pipeline by running
