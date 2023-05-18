@@ -26,11 +26,12 @@ hazelcast:
         customers:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
         transactions:
+          time-to-live-seconds: 300
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
           event-journal:
             enabled: true
             capacity: 1000000
-            time-to-live-seconds: 0
+            time-to-live-seconds: 300
       network:      
         join:
           tcp-ip:
