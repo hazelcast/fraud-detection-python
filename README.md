@@ -110,12 +110,12 @@ Your inference pipeline has now been deployed to Hazelcast. But wait, what is th
 Check the code in `deploy-jobs\src\main\java\org\example\Main.Java`. 
 See the `createPythonMLPipeline()` method
 
-Broadly speaking, the pipeline
-* Gets triggered when a "transaction" is placed in the "transactions" in-memory map in Hazelcast
-* Looks up the relevant customer and merchant from the credit card and merchant code provided in the transaction
-* Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored in the Customer Map in Hazelcast
-* Runs the LightGBM model passing the required input data (transformed )
-* Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory). 
+Broadly speaking, the pipeline stages are:
+* Ingest - placing new transactions in the "transaction" map (in-memory distributed data structure in Hazelcast)
+* Enrich - Using credit card number and merchant code, it looks up data in the "customer" and "merchant" maps. This information was previosuly loaded to Hazelcast in-memory data store (in step 2)
+* Transform - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored in the Customer Map in Hazelcast
+* Predict - Runs the LightGBM model passing the required input data (transformed )
+* Act - Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory) for real-time analytics
 
 # STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
 Go back to your Data loader Terminal Window
