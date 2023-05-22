@@ -102,12 +102,12 @@ cd deploy-jobs
 hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAPSHOT.jar 
 ```
 
-Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? The picture below illustrate what's happening behind the scenes
+Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? The picture below illustrates what this real-time pipeline is automating
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 
 Broadly speaking, the pipeline stages are:
-* **Ingest** - placing new transactions in the "transaction" map (in-memory distributed data structure in Hazelcast)
+* **Ingest** - placing new transactions in the "transaction" map (in-memory distributed data structure in Hazelcast) triggers the execution of this pipeline
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in the "customer" and "merchant" maps. This information was previosuly loaded to Hazelcast in-memory data store (in step 2)
 * **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map)
 * **Predict** - Runs the LightGBM model passing the required input data (transformed in the format required by the model)
@@ -174,7 +174,7 @@ kubectl delete -f hz-pods.yaml
 
 Finally, 
 # DON'T FORGET TO DELETE YOUR KUBERNETES CLUSTER!
-to avoid unnecesary Cloud bills!
+to avoid unnecesary GKE/Cloud bills!
 
 
 
