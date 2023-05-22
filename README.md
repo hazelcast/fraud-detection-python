@@ -102,7 +102,10 @@ cd deploy-jobs
 hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAPSHOT.jar 
 ```
 
-Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing?
+Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? The picture below illustrate what's happening behind the scenes
+![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
+
+
 
 Check the code in `deploy-jobs\src\main\java\org\example\Main.Java`. 
 See the `createPythonMLPipeline()` method
