@@ -9,10 +9,14 @@ The Fraud Analytics Dashboard was written entirely in Python using:
 The Streamlit app is written in [app.py](./app.py). The code is relatively straighforward. 
 
 The key parts are:
-* Connecting to a Hazelcast server - See `def get_hazelcast_client(cluster_members=['127.0.0.1'])`
-* Creating a SQL Schema (aka as a Hazelcast Mapping) so that the client is able to run SQL Queries against data inside a Hazelcast map. See the same method  `def get_hazelcast_client(cluster_members=['127.0.0.1'])`
-* Runnning SQL queries against Hazelcast and transforming the results into a Pandas dataframe format
-    * See the  `def get_df(_client, sql_statement, date_cols):` method
+* Connecting to a Hazelcast server (IP:Port provided in the `HZ_ONNX` environment variable) 
+    * See `def get_hazelcast_client(cluster_members=['127.0.0.1'])`: (defaults to localhost but will the value in `HZ_ONNX` if set)
+* Creating a SQL Schema (aka as a Hazelcast Mapping) so that the client is able to run SQL Queries against data inside a Hazelcast map. 
+    * See `def get_hazelcast_client(cluster_members=['127.0.0.1'])`
+* Runnning SQL queries against Hazelcast and transforming the results into a Pandas dataframe format. See the following methods
+    * `def get_df(_client, sql_statement, date_cols)` 
+    * `def get_dashboard_totals(fraud_probability_threshold)`
+
 * Plotting SQL data returned from Hazelcast using Streamlit
 
 ## The Fraud Analytics Dashboard image
