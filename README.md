@@ -191,7 +191,7 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 
 Using a fictional credit card transaction dataset and Jupyter notebook. [More details here](to-do)
 
-## How is the model loaded and used in the real-time inference pipeline?
+## How was the LightGBM model written in Python loaded and used to score transactions in Hazelcast?
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function. [More details here](to-do)
 With `MapUsingPython`, you can run your Python code with any dependencies inside Hazelcast
