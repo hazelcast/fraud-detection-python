@@ -35,9 +35,9 @@ docker push<yourdockerhubaccount>/python-data-loader
 
 Finally, You will need to update the data-loader deployment manifest file [hz-pod deployment file](../hz-pods.yaml)
 
-Replace `image: docker.io/edsandovalhz/python-sql-fraud-dashboard` with your newly built image 
+**Replace** `image: docker.io/edsandovalhz/python-sql-fraud-dashboard` with your newly built image 
 
-Redeploy/Update the Fraud Dashboard image by applying its Kubernetes deployment manifest with
+**Redeploy** the Fraud Dashboard pod by applying its Kubernetes deployment manifest with
 ```
 cd ..
 kubectl apply -f hz-pods.yaml
