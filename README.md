@@ -173,7 +173,7 @@ kubectl delete -f hz-pods.yaml
 ```
 
 Finally, 
-# DON'T FORGET TO DELETE YOUR KUBERNETES CLUSTER!
+# Don't forget to DELETE Your Kubernetes cluster
 to avoid unnecesary GKE/Cloud bills!
 
 
