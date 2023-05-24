@@ -179,19 +179,19 @@ to avoid unnecesary GKE/Cloud bills!
 
 # WANT TO LEARN MORE?
 
-1. How Was the Feature Data Loaded into Hazelcast?
+## How Was the Feature Data Loaded into Hazelcast?
 
 Using Hazelcast Python client. [More details here](./data-loader/README.md)
 
-2. How Was the Fraud Dashboard built?
+## How Was the Fraud Dashboard built?
 
 With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [More details here](to-do)
 
-3. How was the LightGBM model trained? 
+## How was the LightGBM model trained? 
 
 Using a fictional credit card transaction dataset and Jupyter notebook. [More details here](to-do)
 
-4. How is the model loaded and used in the real-time inference pipeline?
+## How is the model loaded and used in the real-time inference pipeline?
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function. [More details here](to-do)
 With `MapUsingPython`, you can run your Python code with any dependencies inside Hazelcast
