@@ -1,0 +1,1 @@
+hazelcast-python-client[stats]~=5.2.0
