@@ -1,2 +1,4 @@
 .DS_Store
 data-loader/entities/__pycache__
+deploy-jobs/.idea
+model-training/.ipynb_checkpoints
