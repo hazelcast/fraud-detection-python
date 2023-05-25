@@ -190,6 +190,14 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 ## How was the LightGBM model trained? 
 
 Using a fictional credit card transaction dataset and the LightGBM framework. [Check out this Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing)
+The notebook describes most of the training process. You will notice that 
+* It only uses 50% of the original dataset for training and 
+* it drops a few features 
+
+This was done so you can train a similar model free on Google Colab. 
+
+When you execute all Cells in the notebook, you can download the train model
+[!Download trained Model from Colab](./images/download-model.png)
 
 ## How was the LightGBM model used to score transactions in a Hazelcast Jet Job (Pipeline API)?
 
