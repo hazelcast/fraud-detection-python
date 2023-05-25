@@ -194,9 +194,9 @@ The notebook describes most of the training process. You will notice that
 * It only uses 50% of the original dataset for training and 
 * it drops a few features 
 
-This was done so you can train a similar model free on Google Colab. 
+This was done so you can train a similar model for free on Google Colab. 
 
-When you execute all Cells in the notebook, you can download the train model
+When you execute all Cells in the notebook, you can download the trained model
 ![Download trained Model from Colab](./images/download-model.png)
 
 ## How was the LightGBM model used to score transactions in a Hazelcast Jet Job (Pipeline API)?
