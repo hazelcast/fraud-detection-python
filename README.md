@@ -203,7 +203,7 @@ When you execute all Cells in the notebook, you can download the trained model
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function.
 
-The `MapUsingPython` function allows to run Python code inside a Hazelcast.
+The `MapUsingPython` function allows to run Python code on a Hazelcast cluster
 
 This function must be used in a Hazelcast Pipeline.
 
