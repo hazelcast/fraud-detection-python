@@ -199,10 +199,12 @@ This was done so you can train a similar model for free on Google Colab.
 When you execute all Cells in the notebook, you can download the trained model
 ![Download trained Model from Colab](./images/download-model.png)
 
-## How was the LightGBM model used to score transactions in a Hazelcast Jet Job (Pipeline API)?
+## How was the LightGBM model used to score transactions in a Hazelcast?
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function.
-With `MapUsingPython`, you can run your Python code with any dependencies inside Hazelcast
+The `MapUsingPython` function allows to run Python code inside a Hazelcast.
+This function must be used in a Hazelcast Pipeline.
+
 
 
 
