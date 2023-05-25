@@ -207,7 +207,9 @@ Using Hazelcast's Pipeline API and the `MapUsingPython` function.
 
 The `MapUsingPython` function allows to run Python code on a Hazelcast cluster
 
-This function must be used in a Hazelcast Pipeline.
+This function can only be used in a Hazelcast Pipeline.
+
+
 
 
 
