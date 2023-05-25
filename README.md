@@ -5,7 +5,7 @@ Make sure you have
     * 8GB memory
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/)
 * [gcloud](https://cloud.google.com/sdk/docs/install)
-* [Helm] (https://helm.sh/docs/intro/install/) 
+* [Helm](https://helm.sh/docs/intro/install/) 
 * [Hazelcast CLI tool 5.2.1 (or higher)](https://docs.hazelcast.com/hazelcast/5.3/getting-started/install-hazelcast#using-the-binary)
 
 # Fraud Detection With Hazelcast 
