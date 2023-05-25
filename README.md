@@ -3,10 +3,10 @@ Make sure you have
 * A GKE cluster with 4 nodes. Each with
     * 8 VCPUs and 
     * 8GB memory
-* Kubectl
-* gcloud
-* Helm 
-* Hazelcast 5.2.1 client (hz-cli tool)
+* [Kubectl](https://kubernetes.io/docs/tasks/tools/)
+* [gcloud](https://cloud.google.com/sdk/docs/install)
+* [Helm] (https://helm.sh/docs/intro/install/) 
+* [Hazelcast CLI tool 5.2.1 (or higher)](https://docs.hazelcast.com/hazelcast/5.3/getting-started/install-hazelcast#using-the-binary)
 
 # Fraud Detection With Hazelcast 
 In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast. 
@@ -14,7 +14,7 @@ In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast.
 ![Real-time Fraud Detection Demo Set up](./images/set-up.png)
 
 The main components are:
-* A Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
+* A 3-node Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
 * A customer and merchant data loader program (written in Python) showing how to load data into Hazelcast (distributed in-memory data store)
 * A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of steps to determine if an incoming transaction is potentially fraudulent. 
 * A Python transaction loader program similuating transactions being sent to Hazelcast
@@ -31,7 +31,9 @@ cd fraud-detection-python
 # STEP 1: Set up Your Kubernetes Cluster 
 
 
-Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. You can use any Kubernetes service provider. We will use Google Kubernetes Engine (GKE) in this setup
+Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. 
+
+We will use Google Kubernetes Engine (GKE) in this setup but you could use another Kubernetes provider. Just make sure your `kubectl` is pointing to it
 
 In GKE, create a cluster named `hz-fraud-detection-python`. Ensure your cluster has 4 nodes with at least 8 VCPUs and 8GB memory each.
 
@@ -54,7 +56,7 @@ helm install -f values.yaml hz-python hazelcast/hazelcast
 kubectl apply -f hz-pods.yaml
 ```
 
-Wait 3-5 minutes and ALL 6 PODS should be RUNNING
+Wait 3-5 minutes and **ALL 6 PODS** should be **RUNNING**
 ```
 kubectl get pods
 ```
