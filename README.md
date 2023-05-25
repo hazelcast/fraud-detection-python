@@ -201,7 +201,7 @@ When you execute all Cells in the notebook, you can download the trained model
 
 ## How was the LightGBM model used to score transactions in a Hazelcast Jet Job (Pipeline API)?
 
-Using Hazelcast's Pipeline API and the `MapUsingPython` function. [More details here](to-do)
+Using Hazelcast's Pipeline API and the `MapUsingPython` function.
 With `MapUsingPython`, you can run your Python code with any dependencies inside Hazelcast
 
 
