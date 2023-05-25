@@ -19,7 +19,10 @@ The main components are:
 * A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of steps to determine if an incoming transaction is potentially fraudulent. 
 * A Python transaction loader program similuating transactions being sent to Hazelcast
 * Hazelcast Management Center
-* A Streamlit dashboard illustrating how transactions and fraud predictions can be visualized using Python and SQL
+* A Fraud Analytics dashboard showing transactions and fraud predictions
+
+## Fraud Analytics Dashboard
+By the end of this demo, you will be able to visualize fraud predictions. This dashboard was built in Python and uses SQL to retrieve data from Hazelcast
 
 ![Fraud dashboard](./images/fraud-dashboard.png)
 
