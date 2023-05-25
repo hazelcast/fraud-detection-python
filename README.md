@@ -18,10 +18,12 @@ The main components are:
 * A customer and merchant data loader program (written in Python) showing how to load data into Hazelcast (distributed in-memory data store)
 * A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of steps to determine if an incoming transaction is potentially fraudulent. 
 * A Python transaction loader program similuating transactions being sent to Hazelcast
-* A Streamlit dashboard illustrating how transactions and fraud predictions can be visualized using Python and SQL
 * Hazelcast Management Center
+* A Streamlit dashboard illustrating how transactions and fraud predictions can be visualized using Python and SQL
 
-# Clone this Repo
+![Fraud dashboard](./images/fraud-dashboard.png)
+
+# Let's Get Started - Clone this Repo
 ```
 git clone https://github.com/hazelcast/fraud-detection-python.git
 cd fraud-detection-python
