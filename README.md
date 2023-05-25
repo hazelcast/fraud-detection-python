@@ -189,7 +189,7 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 
 ## How was the LightGBM model trained? 
 
-Using a fictional credit card transaction dataset and Jupyter notebook. [More details here](to-do)
+Using a fictional credit card transaction dataset and the LightGBM framework. [Check out this Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing)
 
 ## How was the LightGBM model used to score transactions in a Hazelcast Jet Job (Pipeline API)?
 
