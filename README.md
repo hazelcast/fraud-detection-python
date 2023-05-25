@@ -202,7 +202,9 @@ When you execute all Cells in the notebook, you can download the trained model
 ## How was the LightGBM model used to score transactions in a Hazelcast?
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function.
+
 The `MapUsingPython` function allows to run Python code inside a Hazelcast.
+
 This function must be used in a Hazelcast Pipeline.
 
 
