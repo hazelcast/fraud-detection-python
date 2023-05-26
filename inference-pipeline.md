@@ -21,9 +21,9 @@ This Hazelcast Pipeline is triggered when a new transaction arrives in the "tran
 ![Ingest](./images/create-pipeline.png)
 
 ## Enrich 
-The credit card on the incoming transaction is used to retrieve Customer profile data stored in the "customers" map.
+The credit card on the incoming transaction is used to look up Customer feature data stored in the "customers" map.
 
-Similarly, the merchant code is used to look up merchant profile data stored in the "merchants" map
+Similarly, the merchant code is used to look up merchant feature data stored in the "merchants" map.
 
 ![Enrich](./images/feature-look-up.png)
 
@@ -32,25 +32,21 @@ Here we calculate the "distance from home" by taking the distance between:
 * The customer Lat/Lon stored in his customer profile
 * The Lat/Lon reported on the incoming transaction
 
+![Transform](./images/real-time-feature.png)
+
 
 
 ## Predict
 In order to use Python in this Pipeline, we need to prepare a single String input. Here, the transaction, looked up values and "distance from home" stored as a String.
-![Transform](./images/python-input-string.png)
+![Predict](./images/python-input-string.png)
 
-Here we set up some important parameters for the Python execution environment
-![Transform](./images/python-execution.png)
+Here we call `mapUsingPython` and set up some important parameters for the Python execution environment
+![Predict](./images/python-execution.png)
 
-Here is the actual Python code that loads the model and serves predictions.  See the `transform_list()` method within [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py)
+Here is the actual Python code that loads the model and serves predictions.  
 
-![Transform](./images/python-ml-code.png)
-
-
-
-
-
-
-
+Hazelcast will look for the `transform_list()` method within [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py) and send incoming scoring request to it
+![Predict](./images/python-ml-code.png)
 
 
 # Submitting the Pipeline to Hazelcast
