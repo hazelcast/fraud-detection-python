@@ -37,11 +37,15 @@ Here we calculate the "distance from home" by taking the distance between:
 
 
 ## Predict
+
+### Java
 In order to use Python in this Pipeline, we need to prepare a single String input. Here, the transaction, looked up values and "distance from home" stored as a String.
 ![Predict](./images/python-input-string.png)
 
 Here we call `mapUsingPython` and set up some important parameters for the Python execution environment
 ![Predict](./images/python-execution.png)
+
+### Python
 
 Here is the actual Python code that loads the model and serves predictions.  
 
@@ -49,5 +53,7 @@ Hazelcast will look for the `transform_list()` method within [fraud_handler.py](
 ![Predict](./images/python-ml-code.png)
 
 
-# Submitting the Pipeline to Hazelcast
+# Submitting the Pipeline to Hazelcast (Java)
 
+In [Main.java](./deploy-jobs/src/main/java/org/example/Main.java), the `main()` method shows how to submit the inference pipeline for execution to the Hazelcast cluster
+![Submit pipeline](./images/submit-pipeline.png)
