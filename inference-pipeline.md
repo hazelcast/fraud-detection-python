@@ -14,9 +14,11 @@ Broadly speaking, the pipeline stages are:
 * **Act** - Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory) for real-time analytics
 
 # Creating the Inferenece Pipeline
-Let's walk through the Pipeline creation code in [Main.java]()
+Let's walk through the Pipeline creation code in [Main.java](./deploy-jobs/src/main/java/org/example/Main.java)
 
 ## Ingest
+
+### Java
 This Hazelcast Pipeline is triggered when a new transaction arrives in the "transactions" map.
 ![Ingest](./images/create-pipeline.png)
 
@@ -34,11 +36,8 @@ Here we calculate the "distance from home" by taking the distance between:
 
 ![Transform](./images/real-time-feature.png)
 
-
-
 ## Predict
 
-### Java
 In order to use Python in this Pipeline, we need to prepare a single String input. Here, the transaction, looked up values and "distance from home" stored as a String.
 ![Predict](./images/python-input-string.png)
 
@@ -49,7 +48,7 @@ Here we call `mapUsingPython` and set up some important parameters for the Pytho
 
 Here is the actual Python code that loads the model and serves predictions.  
 
-Hazelcast will look for the `transform_list()` method within [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py) and send incoming scoring request to it
+By default, Hazelcast will look for the `transform_list()` method within the Python module declared. In this case, it is [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py). Hazelcast will send incoming scoring request to each Python instance created (with `localParalellism`)
 ![Predict](./images/python-ml-code.png)
 
 
