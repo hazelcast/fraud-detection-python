@@ -54,5 +54,5 @@ By default, Hazelcast will look for the `transform_list()` method within the Pyt
 
 # Submitting the Pipeline to Hazelcast (Java)
 
-In [Main.java](./deploy-jobs/src/main/java/org/example/Main.java), the `main()` method shows how to submit the inference pipeline for execution to the Hazelcast cluster
+In [Main.java](./deploy-jobs/src/main/java/org/example/Main.java), the `main()` method shows how to submit the inference pipeline to every member in a Hazelcast cluster. The inference pipeline will run in the same member holding the "customer" feature data. This is the key to achieve high throughput and low-latency!
 ![Submit pipeline](./images/submit-pipeline.png)
