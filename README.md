@@ -126,8 +126,10 @@ Broadly speaking, the pipeline stages are:
 * **Act** - Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory) for real-time analytics
 
 
-Check out the Pipeline creation code in `deploy-jobs\src\main\java\org\example\Main.Java`. 
-See the `createPythonMLPipeline()` method
+You can check out the Pipeline creation code in `deploy-jobs\src\main\java\org\example\Main.Java`. 
+
+Or for a more complete description of the pipeline, you can [find more details here](./inference-pipeline.md)
+
 
 
 # STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
