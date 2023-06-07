@@ -71,8 +71,6 @@ public class Main {
 
     private static Pipeline createPythonMLPipeline() throws Exception {
 
-        PythonServiceConfig pythonServiceConfig = getPythonServiceConfig("fraud_handler");
-
         Pipeline pipeline = Pipeline.create();
 
         //pipeline starts as soon as a "transaction" is put on the "transactions" MAP
@@ -151,6 +149,8 @@ public class Main {
 
         //Time to Call the Python Fraud Detection Model and get a prediction!
         // Store the returned prediction in "predictionResult" MAP
+
+        PythonServiceConfig pythonServiceConfig = getPythonServiceConfig("fraud_handler");
         SinkStage predictFraud = getFraudPredictions
                 // Run Python Model
                 .apply(mapUsingPython(pythonServiceConfig))
