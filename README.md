@@ -11,7 +11,7 @@ Make sure you have
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/)
 * [gcloud](https://cloud.google.com/sdk/docs/install)
 * [Helm](https://helm.sh/docs/intro/install/) 
-* [Hazelcast CLI tool 5.2.1 (or higher)](https://docs.hazelcast.com/hazelcast/5.3/getting-started/install-hazelcast#using-the-binary)
+* [Hazelcast CLI tool 5.2](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
 
 # Fraud Detection With Hazelcast 
 In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast. 
