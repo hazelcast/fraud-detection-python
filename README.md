@@ -38,7 +38,9 @@ git clone https://github.com/hazelcast/fraud-detection-python.git
 cd fraud-detection-python
 ```
 
-NOTE: If your clone command fails, set up a Github Personal Access token as [described here](https://www.shanebart.com/clone-repo-using-token/) first. Ensure you set a reasonable expiry date and set scope to: repo, user, admin:public_key
+NOTE: If your clone command fails, set up a Github Personal Access token as [described here](https://www.shanebart.com/clone-repo-using-token/). 
+
+Ensure you set a reasonable expiry date and set scope to: repo, user, admin:public_key
 
 
 
