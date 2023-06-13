@@ -13,6 +13,7 @@ Make sure you have
 * [Helm](https://helm.sh/docs/intro/install/) 
 * [Hazelcast CLI tool 5.2](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
 
+
 # Fraud Detection With Hazelcast 
 In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast. 
 
@@ -36,6 +37,12 @@ By the end of this demo, you will be able to visualize fraud predictions. This d
 git clone https://github.com/hazelcast/fraud-detection-python.git
 cd fraud-detection-python
 ```
+
+NOTE: If your clone command fails, set up a Github Personal Access token as (described here)[https://www.shanebart.com/clone-repo-using-token/] first. Ensure you set a reasonable expiry date and set scope to: repo, user, admin:public_key
+
+Here's the official GitHub documentation on (Personal access tokens)[https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens]
+
+
 
 
 # STEP 1: Set up Your Kubernetes Cluster 
