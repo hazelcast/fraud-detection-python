@@ -124,7 +124,7 @@ hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAP
 ```
 
 ### Windows Users!
-> :warning: **Windows users, run this hz-cli command instead**: Replace <your-hz-python--service-external-ip> with the above EXTERNAL-IP 
+> :warning: **Windows users, run this hz-cli command instead**: Replace `your-hz-python--service-external-ip` with the above EXTERNAL-IP 
 > address for the `hz-python-hazelcast` service
 
 ```
@@ -137,7 +137,9 @@ docker run \
 
 
 ## What is the Real-time Inference pipeline doing?
-Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? The picture below illustrates what this real-time pipeline is automating
+Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? 
+
+The picture below illustrates what this real-time pipeline is automating
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 
@@ -204,8 +206,7 @@ Enjoy!
 # Gracefully Terminate your Kubernetes Deployment
 Go back to you main Terminal
 ```
-helm delete hz-python
-kubectl delete -f hz-pods.yaml
+helm delete hz-python && kubectl delete -f hz-pods.yaml
 ```
 
 Finally, 
@@ -245,7 +246,7 @@ This function can only be used in a Hazelcast Pipeline. See [more details here](
 
 ## Can I run this demo on my local machine (eg. No Kubernetes)?
 
-Yes. You will need Docker and a machine at least 10 CPU cores and 32GB RAM
+Yes, You will need Docker and a machine at least 10 CPU cores and 32GB RAM
 
 See step-by-step [instructions here](./run-demo-locally.md)
 
