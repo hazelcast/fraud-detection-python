@@ -1,8 +1,8 @@
 # Before you start
 Make sure you have
-* A Google Cloud Kubernetes Engine (GKE) cluster with 5 nodes. Each with:
-    * 8 VCPUs and 
-    * 8GB memory
+* A Google Cloud Kubernetes Engine (GKE) cluster with 4 nodes. Each with:
+    * 16 VCPU cores and 
+    * 16 GB memory
 * Your Google Cloud user has:
     * The `Owner` Role in the Google Cloud Project your GKE cluster is running on OR
     * A role containing the `container.clusterRoleBindings.create` permission.  This perms is included in `Kubernetes Engine Admin`
