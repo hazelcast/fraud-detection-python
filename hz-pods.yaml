@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: data-loader
-          image: docker.io/edsandovalhz/python-data-loader
+          image: docker.io/edsandovalhz/hz-531-python-311-data-loader
           env:
           - name: HZ_ENDPOINT
             value: "hz-python-hazelcast:5701"
@@ -56,12 +56,12 @@ spec:
     spec:
       containers:
         - name: fraud-dashboard
-          image: docker.io/edsandovalhz/python-sql-fraud-dashboard
+          image: docker.io/edsandovalhz/hz-531-python-311-fraud-dashboard
           ports:
             - name: fb-port
               containerPort: 8501
               protocol: TCP
           env:
-          - name: HZ_ONNX
+          - name: HZ_ENDPOINT
             value: "hz-python-hazelcast:5701"
 

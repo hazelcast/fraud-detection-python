@@ -1,0 +1,19 @@
+hazelcast:
+  jet:
+    enabled: true
+    resource-upload-enabled: true
+  network:
+    rest-api:
+      enabled: true
+  map:
+    predictionResult:
+      partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
+    customers:
+      partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
+    transactions:
+      time-to-live-seconds: 300
+      partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
+      event-journal:
+        enabled: true
+        capacity: 1000000
+        time-to-live-seconds: 300

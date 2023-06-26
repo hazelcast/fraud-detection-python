@@ -31,15 +31,15 @@
     </repositories>
     <dependencies>
         <dependency>
-
             <groupId>com.hazelcast</groupId>
-            <artifactId>hazelcast-enterprise</artifactId>
-            <version>5.2.3</version>
+            <artifactId>hazelcast</artifactId>
+            <version>5.3.1</version>
         </dependency>
+
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet-python</artifactId>
-            <version>5.2.3</version>
+            <version>5.3.1</version>
         </dependency>
 
         <dependency>
@@ -61,17 +61,6 @@
                             <mainClass>org.example.Main</mainClass>
                         </manifest>
                     </archive>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>com.hazelcast.cloud</groupId>
-                <artifactId>hazelcast-cloud-maven-plugin</artifactId>
-                <version>0.0.5</version>
-                <configuration>
-                    <apiBaseUrl>https://api.viridian.hazelcast.com</apiBaseUrl>
-                    <clusterName>pr-2jqp8ujc</clusterName>
-                    <apiKey>7dShsFTCRLgTwyZ2LQ0irVUaj</apiKey>
-                    <apiSecret>ojJR7mdVjlSYBzc035dGWwSvSwgNwkYS6hCeIyzOJp2SksT9fEjleywCjknk</apiSecret>
                 </configuration>
             </plugin>
         </plugins>

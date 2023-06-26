@@ -1,4 +1,8 @@
 .DS_Store
 data-loader/entities/__pycache__
-deploy-jobs/.idea
+deploy-jobs/.idea/
+deploy-jobs/target/maven-archiver/
 model-training/.ipynb_checkpoints
+.vscode
+data-loader/data/transaction-stream-full.csv
+deploy-jobs/target/maven-status
