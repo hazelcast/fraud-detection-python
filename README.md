@@ -69,7 +69,7 @@ helm repo update
 
 Finally, deploy all components with
 ```
-kubectl apply -f hz-pods.yaml && helm install -f values.yaml hz-python hazelcast/hazelcast
+helm install -f values.yaml hz-python hazelcast/hazelcast && kubectl apply -f hz-pods.yaml 
 ```
 
 Wait 3-5 minutes and **ALL 6 PODS** should be **RUNNING**
