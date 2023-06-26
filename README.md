@@ -128,6 +128,11 @@ hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAP
 > :warning: **Windows users, run this hz-cli command instead**: Replace `your-hz-python--service-external-ip` with the above EXTERNAL-IP 
 > address for the `hz-python-hazelcast` service
 
+First cd to the deploy-jobs directory
+```
+cd deploy-jobs
+```
+
 ```
 docker run \
     -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar \
