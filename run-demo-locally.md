@@ -5,12 +5,14 @@
 Make sure your system meets the following requirements:
 * 10+ CPU Cores
 * 16 GB memory
-Your system needs to have installed the following software
+
+
+Your system needs to have installed the following software:
 * Docker
 * [Hazelcast 5.3.1](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
 * [Python 3.11](https://www.python.org/downloads/)
 * A tool to create Python Virtual environments. Use any of the following:
-    * [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/#id2) OR
+    * [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/#id2) or
     * [Virtualenv](https://virtualenv.pypa.io/en/latest/installation.html)
     
 # 2. Start a single-node Hazelcast Cluster
@@ -32,7 +34,7 @@ docker run -v "$(pwd)"/config.yml:/usr/lib/hazelcast/config.yml \
 ```
 
 Make a note of the IP address of the Hazelcast member on the `hazelcast-network`
-![Fraud dashboard](./images/fraud-dashboard.png)
+![Fraud dashboard](./images/local-hz-started.png)
 
 In this case, it is '172.18.0.2'
 
@@ -59,13 +61,11 @@ python feature-data-loader.py
 ```
 
 # 4. Submit the Inference Pipeline to Hazelcast
-Now to the deploy-jobs folder
+Change to the the deploy-jobs folder
 ```
 cd ../deploy-jobs
 ```
-Run this Command. 
-
-Make sure you replace both references to `172.18.0.2` with YOUR Hazelcast IP address.
+Run this Command. Make sure you replace both references to `172.18.0.2` with YOUR Hazelcast IP address.
 
 See Step 2 above to get the Hazelcast IP address on the `hazelcast-network`
 
@@ -77,6 +77,7 @@ docker run -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/de
     /usr/lib/hazelcast/bin/hz-cli submit -t 172.18.0.2:5701 -c org.example.Main /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
 ```
 NOTE 1: You can safely ignore the error "No jobs submitted"
+
 NOTE 2: You can check your Hazelcast docker logs to confirm Hazelcast member is now running 8 Python instances!
 
 ![Pipeline with 8 Python processes](./images/pipeline-python.png)
@@ -92,7 +93,7 @@ python transaction-data-loader.py data/test.csv 1 100
 ```
 
 # 6. Check the Fraud Analytics Dashboard
-Go to the fraud-dashboard folder
+Go to the fraud-dashboard directory
 ```
 cd ../fraud-dashboard
 ```
@@ -110,7 +111,7 @@ export HZ_ENDPOINT=127.0.0.1 && streamlit run app.py
 A browser window opens 
 ![Fraud Dashboard](./images/1k-dashboard.png)
 
-Things to Try
+## Try
 * Click on the bubbles and the map chart will focus on the relevant set of transactions
 * Try crafting SQL statements on the Analyst Playground (CMD + Enter to execute SQL)
 
