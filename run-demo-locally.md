@@ -76,9 +76,9 @@ docker run -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/de
     --rm edsandovalhz/hz-531-python-310 \
     /usr/lib/hazelcast/bin/hz-cli submit -t 172.18.0.2:5701 -c org.example.Main /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
 ```
-NOTE 1: You can safely ignore the error "No jobs submitted"
+**NOTE 1:** You can safely ignore the error "No jobs submitted"
 
-NOTE 2: You can check your Hazelcast docker logs to confirm Hazelcast member is now running 8 Python instances!
+**NOTE 2:** You can check your Hazelcast docker logs to confirm Hazelcast member is now running 8 Python instances!
 
 ![Pipeline with 8 Python processes](./images/pipeline-python.png)
 
