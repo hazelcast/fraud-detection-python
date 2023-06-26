@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.11.4-slim
 
 WORKDIR /app
 
@@ -14,6 +14,10 @@ RUN mkdir /app/entities
 COPY entities/__init__.py ./entities/__init__.py
 COPY entities/Customer.py ./entities/Customer.py
 COPY entities/Merchant.py ./entities/Merchant.py
+
+#skip Serializers
+#COPY entities/CustomerSerializer.py ./entities/CustomerSerializer.py
+#COPY entities/MerchantSerializer.py ./entities/MerchantSerializer.py
 
 #Copy Customer and Merchant data files
 RUN mkdir /app/data

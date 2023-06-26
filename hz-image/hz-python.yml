@@ -1,0 +1,5 @@
+version: "3.9"
+services:
+  hz-531-python-310:
+    build: ./
+    platform: linux/amd64

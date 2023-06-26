@@ -1,6 +1,6 @@
 # Before you start
 Make sure you have
-* A Google Cloud Kubernetes Engine (GKE) cluster with 4 nodes. Each with:
+* A Google Cloud Kubernetes Engine (GKE) cluster with 5 nodes. Each with:
     * 8 VCPUs and 
     * 8GB memory
 * Your Google Cloud user has:
@@ -11,7 +11,7 @@ Make sure you have
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/)
 * [gcloud](https://cloud.google.com/sdk/docs/install)
 * [Helm](https://helm.sh/docs/intro/install/) 
-* [Hazelcast CLI tool 5.2](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
+* [Hazelcast CLI tool 5.3.1](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
 
 
 # Fraud Detection With Hazelcast 
@@ -49,9 +49,10 @@ Ensure you set a reasonable expiry date and set scope to: repo, user, admin:publ
 
 Make sure you have a Kubernetes cluster and your `kubectl` command pointing to it. 
 
-We will use Google Kubernetes Engine (GKE) in this setup but you could use another Kubernetes provider. Just make sure your `kubectl` is pointing to it
+We will use Google Kubernetes Engine (GKE) in this setup but you could use another Kubernetes provider. 
 
-In GKE, create a cluster named `hz-fraud-detection-python`. Ensure your cluster has 4 nodes with at least 8 VCPUs and 8GB memory each.
+In GKE, create a cluster named `hz-fraud-detection-python`. Ensure your cluster has 5 nodes with at least 8 VCPUs and 8GB memory each.
+You can use this [video as guide to create your GKE Cluster](https://youtu.be/hxpGC19PzwI?t=395)
 
 Once created, you can point `kubectl` to it by running
 ```
@@ -68,8 +69,7 @@ helm repo update
 
 Finally, deploy all components with
 ```
-helm install -f values.yaml hz-python hazelcast/hazelcast 
-kubectl apply -f hz-pods.yaml
+kubectl apply -f hz-pods.yaml && helm install -f values.yaml hz-python hazelcast/hazelcast
 ```
 
 Wait 3-5 minutes and **ALL 6 PODS** should be **RUNNING**
@@ -94,7 +94,7 @@ Within that terminal run
 ```
 python feature-data-loader.py
 ```
-The output should confirm that customer and merchant data is now in Hazelcast
+The output should confirm that Customer and Merchant data is now stored in Hazelcast
 ![kubectl get pods](./images/data-load.png)
 
 # STEP 3: Submit Real-time Inference Pipeline to Hazelcast
@@ -117,14 +117,31 @@ export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
 Now you can deploy the real-time inference pipeline by running
 ```
 cd deploy-jobs
+```
+Folowed by
+```
 hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAPSHOT.jar 
 ```
 
+### Windows Users!
+> :warning: **Windows users, run this hz-cli command instead**: Replace <your-hz-python--service-external-ip> with the above EXTERNAL-IP 
+> address for the `hz-python-hazelcast` service
+
+```
+docker run \
+    -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar \
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 
+    --rm edsandovalhz/hz-531-python-310 \
+    /usr/lib/hazelcast/bin/hz-cli submit -t <your-hz-python--service-external-ip>:5701 -c org.example.Main /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
+```
+
+
+## What is the Real-time Inference pipeline doing?
 Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? The picture below illustrates what this real-time pipeline is automating
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 
-Broadly speaking, the pipeline stages are:
+Broadly speaking, the pipeline is processing incoming transactions. The steps:
 * **Ingest** - placing new transactions in the "transaction" map (in-memory distributed data structure in Hazelcast) triggers the execution of this pipeline
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in the "customer" and "merchant" maps. This information was previosuly loaded to Hazelcast in-memory data store (in step 2)
 * **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map)
@@ -132,17 +149,16 @@ Broadly speaking, the pipeline stages are:
 * **Act** - Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory) for real-time analytics
 
 
-You can check out the Pipeline creation code in `deploy-jobs\src\main\java\org\example\Main.Java`. 
-
-Or for a more complete description of the pipeline, you can [find more details here](./inference-pipeline.md)
+You can find a full description of the [inference pipeline here](./inference-pipeline.md)
 
 
 
 # STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
-Go back to your Data loader Terminal Window
+Go back to your Data loader Terminal window
 ```
-python transaction-data-loader.py data/transaction-stream-full.csv
+python transaction-data-loader.py data/transaction-stream-full.csv 4 5000
 ```
+Note: This command will split the load into 4 processes. Each process will print out a message for every 5000 transactions loaded
 
 # STEP 5: Monitor your Inference Pipeline in Management Center
 Go back to your main Terminal Window
@@ -227,6 +243,11 @@ The `MapUsingPython` function allows to run Python code on a Hazelcast cluster
 
 This function can only be used in a Hazelcast Pipeline. See [more details here](./inference-pipeline.md)
 
+## Can I run this demo on my local machine (eg. No Kubernetes)?
+
+Yes. You will need Docker and a machine at least 10 CPU cores and 32GB RAM
+
+See step-by-step [instructions here](./run-demo-locally.md)
 
 
 

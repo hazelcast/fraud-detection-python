@@ -2,11 +2,14 @@ import hazelcast
 import csv
 import os
 import json
-from hazelcast.serialization.api import Portable
 from hazelcast import HazelcastClient
+from hazelcast.core import HazelcastJsonValue
 from hazelcast.discovery import HazelcastCloudDiscovery
+# Data Classes
 from entities.Customer import Customer
 from entities.Merchant import Merchant
+
+
 
 def load_dictionary(json_file):
     with open (json_file) as f:
@@ -78,13 +81,7 @@ def get_client():
     cluster_member_string = os.environ.get('HZ_ENDPOINT', '127.0.0.1')
     cluster_members = cluster_member_string.split(",")
     print(cluster_members)
-    client = hazelcast.HazelcastClient(cluster_members=cluster_members,
-        use_public_ip=True,
-        portable_factories={
-            Merchant.FACTORY_ID: {Merchant.CLASS_ID: Merchant},
-            Customer.FACTORY_ID: {Customer.CLASS_ID: Customer}
-            }
-    )
+    client = hazelcast.HazelcastClient(cluster_members=cluster_members,use_public_ip=True)
     return client
 
 print("starting hazelcast client")
@@ -95,7 +92,8 @@ print("Connection Successful!")
 merchant_map = client.get_replicated_map('merchants')
 merchants = load_merchants('./data/merchant_data.csv','./data/merchant_dict.json','./data/category_dict.json')
 for m in merchants:
-    merchant_map.put(m.name, m)
+    merchant_json = json.dumps(m.__dict__)
+    merchant_map.put(m.name, HazelcastJsonValue(merchant_json))
 
 #load customers
 customer_map = client.get_map("customers")
@@ -108,13 +106,20 @@ category_mapping_files['setting_codes'] = './data/setting_dict.json'
 category_mapping_files['zip_codes'] = './data/zip_dict.json'
 customers = load_customers('./data/customer_data.csv',category_mapping_files)
 for customer in customers:
-    customer_map.put(str(customer.cc_num),customer)
+    customer_json = json.dumps(customer.__dict__)
+    customer_map.put(str(customer.cc_num),HazelcastJsonValue(customer_json))
+
 #Doble check customer and merchant data is on Hazelcast Maps
+
+#merchant data
 merchant_map = client.get_replicated_map("merchants").blocking()
 num_merchants = merchant_map.size()
 print(f' Loaded {num_merchants} Merchants')
+
+#customer data
 customer_map = client.get_map("customers").blocking()
 num_customers = customer_map.size()
 print(f' Loaded {num_customers} Customers')
 
+#Disconnect from Hazelcast
 client.shutdown()

@@ -6,6 +6,7 @@ import hazelcast
 import plotly.express as px
 import os
 from streamlit_plotly_events import plotly_events
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(layout="wide")
 
@@ -23,7 +24,7 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             merchant VARCHAR,
             merchant_lat DOUBLE,
             merchant_lon DOUBLE,
-            credit_card_number BIGINT,
+            credit_card_number VARCHAR,
             customer_name VARCHAR,
             customer_city VARCHAR,
             customer_age_group VARCHAR,
@@ -31,12 +32,9 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             customer_lat DOUBLE,
             customer_lon DOUBLE,
             distance_from_home REAL,
-            
-            
             fraud_model_prediction INT,
             fraud_probability DOUBLE,
-            inference_time_ns BIGINT,
-            transaction_processing_total_time BIGINT
+            inference_time_ns BIGINT
             )
             TYPE IMap
             OPTIONS (
@@ -49,7 +47,8 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
 @st.cache_data
 def get_df(_client, sql_statement, date_cols):
     #mapping hazelcast SQL Types to Pandas dtypes
-    sql_to_df_types = {0:'category',6:'float32',8:'float32',5:'int32',7:'float32',4:'int32',1:'bool'}
+    #https://hazelcast.readthedocs.io/en/stable/api/sql.html#hazelcast.sql.SqlColumnType.VARCHAR
+    sql_to_df_types = {0:'string',6:'float32',8:'float32',5:'int32',7:'float32',4:'int32',1:'bool'}
 
     sql_result = client.sql.execute(sql_statement).result()
 
@@ -64,6 +63,8 @@ def get_df(_client, sql_statement, date_cols):
     column_values = {}
     for c in column_names:
         column_values[c] = []
+
+    #for every row in result
     for row in sql_result:
         for c in column_names:
             value = row.get_object(c)
@@ -84,7 +85,7 @@ def get_df(_client, sql_statement, date_cols):
     
     return df
 
-@st.cache_data
+#@st.cache_data
 def get_dashboard_totals(fraud_probability_threshold):
     result = {}
     sql_statement = 'SELECT count(*) as total_records, sum(amount) as total_amount, avg(amount) as avg_amount, avg(distance_from_home) as avg_distance_km FROM predictionResult LIMIT 1'
@@ -120,8 +121,10 @@ def get_categorical_variables():
     categorical_features =['customer_name','customer_city','customer_age_group','customer_gender']
     return categorical_features
 
-#Connect to hazelcast - use env variable HZ_ONNX, if provided
-hazelcast_node = os.environ['HZ_ONNX']
+
+
+#Connect to hazelcast - use env variable HZ_ENDPOINT, if provided
+hazelcast_node = os.environ['HZ_ENDPOINT']
 if hazelcast_node:
     client = get_hazelcast_client([hazelcast_node])
 else:
@@ -136,6 +139,9 @@ st.sidebar.header('Fraud Probability Threshold')
 probability_threshold = st.sidebar.slider('Enter Threshold',0,100,70,1)
 st.sidebar.header('Key Dimensions','key dimensions')
 category_selected = st.sidebar.selectbox('', categorical_features)
+
+st.sidebar.header('Refresh Settings','refresh')
+refresh_internval = st.sidebar.slider('Auto Refresh Period (Seconds)',10,30,20,1)
 
 
 #Continue Loading data
@@ -209,12 +215,12 @@ if (selected_points):
     selected_value = df_bubble.loc[df_bubble['total_amount'] == total_amount_chosen ][category_selected].to_list()[0]
     categorical_values = '\'' + selected_value + '\''
 
-#query for merchant lat/lon - filter to only most impacted values displayed in bubble chart
+#query for merchant lat/lon - filter most impacted values displayed in bubble chart
 sql_statement = """
     select merchant_lat,merchant_lon
     from predictionResult 
     where fraud_probability > {fraud_threshold} and {category_selected} in ({categorical_values})
-    limit 1000
+    limit 100
     """.format(category_selected=category_selected,categorical_values=categorical_values,fraud_threshold=fraud_threshold)
 
 df_map = get_df(client,sql_statement=sql_statement,date_cols=[])
@@ -230,19 +236,18 @@ with col_chart2:
 st.header('Analyst - SQL Playground','sql_playground')
 sql_statement = st.text_area('Enter a SQL Query', 'SELECT * \nFROM predictionResult \nLIMIT 100',200)
 
+#heuristic button animation only
 deploy_heuristic_button = st.button('Deploy New Fraud Detection Pattern', type="secondary", disabled=False)
-#st.write(deploy_heuristic_button)
 if deploy_heuristic_button:
     st.balloons()
 
 #SQL Results
 st.header('SQL Results','data')
 if sql_statement:
-    #df3 = get_df(client,sql_statement,['transaction_date'])
     df3 = get_df(client,sql_statement,[])
     st.write(df3)
 
-
+count = st_autorefresh(interval = refresh_internval * 1000, limit=10000, key="refresh-counter")
 
 #Other fields in the PredictionResult map (JSONObject)
     #transaction_weekday_code INT,
@@ -256,3 +261,4 @@ if sql_statement:
     #customer_age_group_code INT,
     #customer_job_code INT,
     #category_code INT,
+    #transaction_processing_total_time BIGINT

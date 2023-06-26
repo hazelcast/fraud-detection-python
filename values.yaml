@@ -1,6 +1,7 @@
 image:
-  repository: docker.io/edsandovalhz/hz-onnx
+  repository: edsandovalhz/hz-531-python-310
   tag: latest
+  pullPolicy: Always
 
 cluster:
   memberCount: 3
@@ -13,7 +14,7 @@ topologySpreadConstraints:
       "app.kubernetes.io/instance": hz-python
 
 hazelcast:
-  
+  #loggingLevel: DEBUG
   yaml:
     hazelcast:
       partition-group:
@@ -30,7 +31,7 @@ hazelcast:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
           event-journal:
             enabled: true
-            capacity: 1000000
+            capacity: 10000
             time-to-live-seconds: 300
       network:      
         join:
