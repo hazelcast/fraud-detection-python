@@ -76,7 +76,7 @@ docker run -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/de
 ```
 **NOTE 1:** You can safely ignore the error "No jobs submitted"
 
-**NOTE 2:** You can check your Hazelcast docker logs to confirm Hazelcast member is now running 8 Python instances!
+**NOTE 2:** You can check your Hazelcast docker logs to confirm your Hazelcast inference job is running supported by 8 Python instances!
 
 ![Pipeline with 8 Python processes](./images/pipeline-python.png)
 
