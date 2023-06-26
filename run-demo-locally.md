@@ -65,9 +65,7 @@ Change to the the deploy-jobs folder
 ```
 cd ../deploy-jobs
 ```
-Run this Command. Make sure you replace both references to `172.18.0.2` with YOUR Hazelcast IP address.
-
-See Step 2 above to get the Hazelcast IP address on the `hazelcast-network`
+Run this Command. Make sure you replace both references to `172.18.0.2` with YOUR Hazelcast IP address. See Step 2 above to get the Hazelcast IP address on the `hazelcast-network`
 
 ```
 docker run -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar \
