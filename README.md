@@ -59,7 +59,7 @@ Once created, you can point `kubectl` to it by running
 gcloud container clusters get-credentials hz-fraud-detection-python --zone europe-west2-a --project <your-gke-project>
 ```
 
-## Deploy a Management Center, Fraud Dashboard, Data loaders and a 3-node Hazelcast cluster 
+## Deploy a 3-node Hazelcast Cluster, Management Center, Fraud Dashboard & Data loader PODS
 First, prepare your Kubernetes cluster with
 ```
 kubectl apply -f https://raw.githubusercontent.com/hazelcast/hazelcast-kubernetes/master/rbac.yaml
