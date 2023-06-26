@@ -109,6 +109,7 @@ You should see the following SERVICES available
 
 Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
 
+## 3.1 MAC & Linux Users
 Set an environment variable
 ```
 export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
@@ -123,7 +124,7 @@ Folowed by
 hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAPSHOT.jar 
 ```
 
-### Windows Users!
+## 3.2  Windows Users!
 > :warning: **Windows users, run this hz-cli command instead**: Replace `your-hz-python--service-external-ip` with the above EXTERNAL-IP 
 > address for the `hz-python-hazelcast` service
 
