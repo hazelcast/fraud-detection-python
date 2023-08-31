@@ -41,7 +41,11 @@
             <artifactId>hazelcast-jet-python</artifactId>
             <version>5.3.1</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.hazelcast.jet</groupId>
+            <artifactId>hazelcast-jet-kafka</artifactId>
+            <version>5.3.1</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-spatial</artifactId>
