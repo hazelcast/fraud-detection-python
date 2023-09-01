@@ -1,7 +1,5 @@
 package org.example;
 
-import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
@@ -34,12 +32,12 @@ import static java.util.concurrent.TimeUnit.*;
 import static java.util.concurrent.TimeUnit.HOURS;
 
 public class Main {
-    private static final String TRANSACTION_MAP = "transactions";
     private static final String STREAMING_FEATURE_CALCULATION_JOB_NAME="fraud-detection-streaming-features-calculation";
     private static final String TRANSACTION_PROCESSING_JOB_NAME="fraud-detection-transaction-processing-ml";
     private static final String MERCHANT_MAP="merchants";
     private static final String CUSTOMER_MAP="customers";
     private static final String STREAMING_FEATURE_MAP = "streaming-features";
+    private static final String PREDICTION_MAP = "predictionResult";
 
     public static void main(String[] args) throws Exception {
 
@@ -49,7 +47,7 @@ public class Main {
         String KAFKA_CLUSTER_KEY = env.get("KAFKA_CLUSTER_KEY");
         String KAFKA_CLUSTER_SECRET = env.get("KAFKA_CLUSTER_SECRET");
         String KAFKA_CLUSTER_ENDPOINT = env.get("KAFKA_ENDPOINT");
-        HazelcastInstance client = getHazelClient(HZ_ENDPOINT);
+        HazelcastInstance client = Hazelcast.bootstrappedInstance();
         System.out.println("Connected to Hazelcast at " + HZ_ENDPOINT);
         Properties kafkaConsumerProperties = getKafkaBrokerProperties(KAFKA_CLUSTER_ENDPOINT,KAFKA_CLUSTER_KEY,KAFKA_CLUSTER_SECRET);
 
@@ -60,10 +58,8 @@ public class Main {
         Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties);
 
         //Submit Jobs to Hazelcast for execution
-        //submitJob(STREAMING_FEATURE_CALCULATION_JOB_NAME,streamingFeaturePipeline,client);
+        submitJob(STREAMING_FEATURE_CALCULATION_JOB_NAME,streamingFeaturePipeline,client);
         submitJob(TRANSACTION_PROCESSING_JOB_NAME,transactionProcessingPipeline,client);
-
-
 
     }
     private static void submitJob(String jobName, Pipeline pipeline,HazelcastInstance client) {
@@ -82,18 +78,17 @@ public class Main {
         client.getJet().newJob(pipeline,jobConfig);
 
     }
-    private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties) {
+    private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties)  throws Exception {
         Pipeline p = Pipeline.create();
         // Get stream of Transactions from Kafka
         StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties);
 
         //log original transaction received
-        SinkStage sendToLogger = source
-                .writeTo((Sinks.logger()));
+        //SinkStage sendToLogger = source
+        //        .writeTo((Sinks.logger()));
 
-        //Retrieve Current Streaming Feature values from map
-        /*
-        StreamStage<Tuple2<HazelcastJsonValue, Map.Entry<Object, Object>>> retrieveStreamingFeatures = source
+        //1. Retrieve Current Streaming Feature values from map
+        StreamStage<Tuple2<HazelcastJsonValue, JsonObject>> retrieveStreamingFeatures = source
                 .mapUsingIMap(
                         STREAMING_FEATURE_MAP,
                         //key is credit card number
@@ -102,8 +97,9 @@ public class Main {
                         (transactionTuple, streamingFeatureValues) -> {
                             //current transaction
                             String transactionJson = transactionTuple.getValue().toString();
+                            JsonObject transactionJsonObject = getJsonObject(transactionJson);
                             //existing values in streaming-feature map (as JsonObject)
-                            JsonObject streamingFeaturesAsJsonObject = getStreamingFeaturesAsJsonObject((HazelcastJsonValue) streamingFeatureValues);
+                            JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) streamingFeatureValues);
 
                             //determine transaction count in last 24 hours
                             double transactionCountLastDay = retrieveFeatureByName((HazelcastJsonValue) streamingFeatureValues, transactionJson, "transactions_last_24_hours", DAYS.toMillis(1));
@@ -119,24 +115,143 @@ public class Main {
 
                             //return streaming features + incoming transaction tuple
                             HazelcastJsonValue streamingFeaturesJsonValue = new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
-                            return Tuple2.tuple2(streamingFeaturesJsonValue, transactionTuple);
+                            return Tuple2.tuple2(streamingFeaturesJsonValue, transactionJsonObject);
                         });
 
 
+        //2. Look up Merchant for this transaction (input Tuple <StreamingFeatures, OriginalTransaction)
+        StreamStage<Tuple3<HazelcastJsonValue, JsonObject, JsonObject>> retrieveMerchantFeatures = retrieveStreamingFeatures
+                .mapUsingReplicatedMap(MERCHANT_MAP,
+                        tup -> tup.getValue().getString("merchant", "none"),
+                        (tup, merchant) -> {
+                            JsonObject merchantJSON = getJsonObject((HazelcastJsonValue) merchant);
+                            return Tuple3.tuple3(tup.f0(), tup.f1(), merchantJSON);
+                        })
+                .setName("ENRICH - Retrieve MERCHANT Features");
+
+
+        //3. Look up Customer Info for this transaction (input Tuple <StreamingFeatures, OriginalTransaction, Merchant>)
+        StreamStage<Tuple4<HazelcastJsonValue, JsonObject, JsonObject, JsonObject>> retrieveCustomerFeatures = retrieveMerchantFeatures
+                .mapUsingIMap(CUSTOMER_MAP,
+                        tup -> tup.f1().getString("cc_num", "none"),
+                        (tup, customer) -> {
+                            JsonObject customerJson = getJsonObject((HazelcastJsonValue) customer);
+                            return Tuple4.tuple4(tup.f0(), tup.f1(), tup.f2(), customerJson);
+                        })
+                .setName("ENRICH - Retrieve CUSTOMER Features");
+
+        //4. Prepare JSON String to be sent to Python Fraud Model
+        //(input Tuple <StreamingFeatures, OriginalTransaction, Merchant, Customer>)
+        StreamStage<JsonObject> preparePredictionRequest = retrieveCustomerFeatures
+                .map( tup -> {
+                    //StreamingFeatures, Transaction, Customer and Merchant JsonObjects
+                    JsonObject streamingFeaturesJsonObject = getJsonObject(tup.f0());
+                    JsonObject transactionJsonObject = tup.f1();
+                    JsonObject merchantJsonObject = tup.f2();
+                    JsonObject customerJsonObject = tup.f3();
+                    return prepareFraudPredictionRequest( streamingFeaturesJsonObject, transactionJsonObject, merchantJsonObject, customerJsonObject);
+                });
+
+        //5. Time to Call the Python Fraud Detection Model and get a fraud prediction!
+        PythonServiceConfig pythonServiceConfig = getPythonServiceConfig("fraud_handler");
+
+        StreamStage<JsonObject> predictFraud = preparePredictionRequest
+                //from JsonObject to string for mapUsingPython
+                .map(predictionRequest -> predictionRequest.toString())
+                // Run Python Model
+                .apply(mapUsingPython(pythonServiceConfig))
+                .setLocalParallelism(8)
+                .setName("PREDICT (Python)- Fraud Probability")
+                //From String back into a JSONObject
+                .map(predictionRequest -> getJsonObject(predictionRequest));
+                /*
+                // Store Prediction in  Hazelcast fast data store (MAP)
+                .map (predictionJSON -> {
+                    String key = predictionJSON.getString("transaction_number","") + "@" + predictionJSON.getString("credit_card_number","");
+                    HazelcastJsonValue predictionJsonValue = new HazelcastJsonValue(predictionJSON.toString());
+                    return Tuple2.tuple2(key,predictionJsonValue);
+                })
+                .writeTo(Sinks.map(PREDICTION_MAP));
+        */
+
 
         // Last Step -> Update streaming feature map with last transaction processed timestamp
-        /*SinkStage updateLTPDate = retrieveStreamingFeatures
+        SinkStage updateLTPDate = retrieveStreamingFeatures
                 .writeTo(Sinks.mapWithUpdating(STREAMING_FEATURE_MAP,
-                        tup -> tup.getValue().getKey().toString(),
+                        tup -> tup.f1().getString("cc_num","none"),
                         (old, tup) -> {
                             //get transaction date from transaction json
-                            String transactionJsonString = tup.getValue().getValue().toString();
+                            String transactionJsonString = tup.f1().toString();
                             HazelcastJsonValue existingStreamingValues = (HazelcastJsonValue) old;
                             return updateLastTransactionDate(transactionJsonString,existingStreamingValues);
                         }));
 
-         */
+        //log original transaction received and streaming features input StreamingFeatures(HazelcastJsonValue), TransactionJsonObject, MerchantJsonObject
+        SinkStage sendToLogger = predictFraud
+                .map(request ->  request.toString())
+                .writeTo((Sinks.logger()));
+
+                /*.map (tup -> {
+                    String output = "\n transaction = " + tup.f1().toString();
+                    output+= "\n streaming features = " + tup.f0().toString();
+                    output+= "\n merchant features = " + tup.f2().toString();
+                    output+= "\n customer features = " + tup.f3().toString();
+
+                    return output;
+                })*/
+
+
         return p;
+    }
+    private static JsonObject prepareFraudPredictionRequest(JsonObject streamingFeatures, JsonObject transaction, JsonObject merchant, JsonObject customer) {
+
+        //transaction date
+        LocalDateTime transactionDate = LocalDateTime.parse(transaction.getString("transaction_date",""), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        //calculate distance from merchant to customer billing address
+        double merchantLat = transaction.getFloat("merch_lat",0);
+        double merchantLon = transaction.getFloat("merch_long",0);
+        double customerLat = customer.getFloat("latitude",0);
+        double customerLon = customer.getFloat("longitude",0);
+
+        //distance to 6-decimal places
+        double distanceKms = Math.round(calculateDistanceKms(merchantLat, merchantLon, customerLat, customerLon) * 1000000d) / 1000000d;
+
+        //create fraud prediction request
+        JsonObject fraudPredictionRequest = new JsonObject()
+                .add("transaction_number", transaction.getString("transaction_id","N/A"))
+                .add("transaction_date", transaction.getString("transaction_date",""))
+                .add("timestamp_ms", transaction.getLong("timestamp_ms",0))
+                .add("amount", transaction.getFloat("amt",0))
+                .add("merchant_lat", merchantLat)
+                .add("merchant_lon", merchantLon)
+                .add("merchant", transaction.getString("merchant",""))
+                .add("credit_card_number", transaction.getString("cc_num",""))
+                .add("customer_name", customer.getString("first","") + " " + customer.getString("last",""))
+                .add("customer_city", customer.getString("city",""))
+                .add("customer_age_group", customer.getString("age_group",""))
+                .add("customer_gender", customer.getString("gender",""))
+                .add("customer_lat", customerLat)
+                .add("customer_lon", customerLon)
+                .add("distance_from_home", distanceKms)
+                .add("category_code", merchant.getInt("category_code",0))
+                .add("transaction_weekday_code",transactionDate.getDayOfWeek().getValue()-1)
+                .add("transaction_hour_code",transactionDate.getHour())
+                .add("transaction_month_code",transactionDate.getMonthValue())
+                .add("gender_code", customer.getInt("gender_code",0))
+                .add("customer_zip_code", customer.getInt("zip_code",0))
+                .add("customer_city_population", customer.getInt("city_pop",0))
+                .add("customer_job_code", customer.getInt("job_code",0))
+                .add("customer_age", customer.getInt("age",0))
+                .add("customer_setting_code", customer.getInt("setting_code",0))
+                .add("customer_age_group_code", customer.getInt("age_group_code",0))
+                .add("transaction_processing_total_time", 0)
+                .add("last_transaction_date",streamingFeatures.getLong("last_transaction_date",0))
+                .add("transactions_last_24_hours",streamingFeatures.getInt("transactions_last_24_hours",0))
+                .add("transactions_last_week",streamingFeatures.getInt("transactions_last_week",0))
+                .add("amount_spent_last_24_hours",streamingFeatures.getDouble("amount_spent_last_24_hours",0));
+
+        return  fraudPredictionRequest;
     }
     private static HazelcastJsonValue updateLastTransactionDate(String transactionJsonString,HazelcastJsonValue oldFeatureValues ) {
 
@@ -144,12 +259,11 @@ public class Main {
         long current_transaction_date_ms = transactionJsonObject.getLong("timestamp_ms", -1l);
 
         //use this value to set last transaction date in map
-        JsonObject newJsonObject = getStreamingFeaturesAsJsonObject(oldFeatureValues);
+        JsonObject newJsonObject = getJsonObject(oldFeatureValues);
         newJsonObject.set("last_transaction_date", current_transaction_date_ms);
         return new HazelcastJsonValue(newJsonObject.toString());
 
     }
-
     private static Pipeline createStreamingFeaturesPipeline(Properties kafkaConsumerProperties) {
         //Create new Pipeline
         Pipeline p = Pipeline.create();
@@ -165,8 +279,6 @@ public class Main {
         addSumStreamingFeature(source, "amount_spent_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)), STREAMING_FEATURE_MAP, "amt");
         return p;
     }
-
-
     private static StreamStage<Map.Entry<Object,Object>> sourceTransactionsFromKafka(Pipeline p, Properties kafkaConsumerProperties) {
         return p.readFrom(KafkaSources.kafka(kafkaConsumerProperties,"transactions"))
                 //Use transaction timestamp
@@ -191,12 +303,11 @@ public class Main {
                 .writeTo(Sinks.mapWithUpdating(streamingFeatureMapName,
                         kwr -> kwr.getKey().toString(),
                         (old, entry) -> {
-                            JsonObject streamingFeaturesAsJsonObject = getStreamingFeaturesAsJsonObject((HazelcastJsonValue) old);
+                            JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
                             streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
                             return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
                         }));
     }
-
     private static void addCountStreamingFeature (StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, AggregateOperation1 aggregateOperation, String streamingFeatureMapName) {
 
         //Count events over a window of time
@@ -211,7 +322,7 @@ public class Main {
                 .writeTo(Sinks.mapWithUpdating(streamingFeatureMapName,
                         kwr -> kwr.getKey().toString(),
                         (old, entry) -> {
-                            JsonObject streamingFeaturesAsJsonObject = getStreamingFeaturesAsJsonObject((HazelcastJsonValue) old);
+                            JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
                             streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
                             return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
                         }));
@@ -232,186 +343,19 @@ public class Main {
 
         return props;
     }
-    private static JsonObject getStreamingFeaturesAsJsonObject(HazelcastJsonValue existingValue) {
+    private static JsonObject getJsonObject(HazelcastJsonValue existingValue) {
         return (existingValue==null) ? new JsonObject() : new JsonObject(Json.parse(existingValue.toString()).asObject()) ;
+    }
+    private static JsonObject getJsonObject(String jsonString) {
+        return (jsonString==null) ? new JsonObject() : new JsonObject(Json.parse(jsonString).asObject()) ;
     }
     private static JobConfig getConfig(String jobName) {
         JobConfig cfg = new JobConfig().setName(jobName);
         cfg.addClass(Main.class);
         return cfg;
     }
-    private static Pipeline createPythonMLPipeline() throws Exception {
-
-        Pipeline pipeline = Pipeline.create();
-
-        //pipeline starts as soon as a "transaction" is put on the "transactions" MAP
-        StreamStage<Tuple2<String, JsonObject>> transactions =  pipeline.readFrom(Sources.<String, String>mapJournal(TRANSACTION_MAP,
-                        JournalInitialPosition.START_FROM_CURRENT))
-                .withIngestionTimestamps()
-                .setLocalParallelism(8)
-                .setName("Start Fraud Detection ML Pipeline")
-
-                //Convert Transaction String into JSONObject
-                .map(tup -> Tuple2.tuple2(tup.getKey(),new JsonObject(Json.parse(tup.getValue()).asObject())))
-                .setName("INGEST Transaction in JSON format");
-
-        //Look up Merchant for this transaction
-        StreamStage<Tuple3<String, JsonObject, JsonObject>> enrichMerchantFeatures = transactions
-                .mapUsingReplicatedMap(MERCHANT_MAP,
-                        tup -> tup.getValue().getString("merchant","none"),
-                        (tup, merchant) -> {
-                                    HazelcastJsonValue m = (HazelcastJsonValue) merchant;
-                                    JsonObject merchantJSON = new JsonObject(Json.parse(m.toString()).asObject());
-                                    return Tuple3.tuple3(tup.f0(), tup.f1(),merchantJSON);
-                                })
-                .setName("ENRICH - Retrieve Merchant Features");
-
-
-        //Look up Customer features for this transaction
-        StreamStage<Tuple4<String, JsonObject, JsonObject, JsonObject>> enrichCustomerFeatures = enrichMerchantFeatures
-                .mapUsingIMap(CUSTOMER_MAP,
-                        tup -> tup.f1().getString("cc_num","none"),
-                        (tup, customer) -> {
-                                HazelcastJsonValue c = (HazelcastJsonValue) customer;
-                                JsonObject customerJSON = new JsonObject(Json.parse(c.toString()).asObject());
-                                return Tuple4.tuple4(tup.f0(), tup.f1(), tup.f2(),customerJSON);
-                            })
-
-                .setName("ENRICH - Retrieve Customer Features");
-
-        //Calculate Real-Time Features
-        StreamStage<Tuple5<String, JsonObject, JsonObject, JsonObject, Double>> calculateRealtimeFeatures = enrichCustomerFeatures
-                .map(tup -> {
-                    double transactionLat = tup.f1().getDouble("lat",0);
-                    double transactionLon = tup.f1().getDouble("long",0);
-
-                    JsonObject customerJsonObject = tup.f3();
-                    float customerLatitude = customerJsonObject.getFloat("latitude",0);
-                    float customerLongitude = customerJsonObject.getFloat("longitude",0);
-
-                    //Calculate Distance between Transaction Location and Customer Billing address
-                    double distanceKms = calculateDistanceKms(transactionLat, transactionLon, customerLatitude, customerLongitude);
-                    return Tuple5.tuple5(tup.f0(), tup.f1(), tup.f2(), tup.f3(), distanceKms);
-                })
-                .setName("ENRICH - Real-Time Features");
-
-        //Prepare fraud request (JSON String) to be sent to Python
-        StreamStage<JsonObject> getFraudPredictions = calculateRealtimeFeatures
-                .map(tup -> {
-                    //Customer and Merchant JsonObjects
-                    JsonObject customerJsonObject = tup.f3();
-                    JsonObject merchantJsonObject = tup.f2();
-                    JsonObject transactionJsonObject = tup.f1();
-                    Double distanceKms = tup.f4();
-
-                    //date related codes
-                    LocalDateTime transactionDate = LocalDateTime.parse(tup.f1().getString("transaction_date",""), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                    int weekday = transactionDate.getDayOfWeek().getValue()-1;
-                    int month = transactionDate.getMonthValue();
-                    int hour = transactionDate.getHour();
-                    JsonObject jsonFraudDetectionRequest = new JsonObject()
-                            .add("transaction_number", transactionJsonObject.getString("trans_num",""))
-                            .add("transaction_date", transactionJsonObject.getString("transaction_date",""))
-                            .add("amount", transactionJsonObject.getFloat("amount",0))
-                            .add("merchant", transactionJsonObject.getString("merchant",""))
-                            .add("merchant_lat", transactionJsonObject.getDouble("lat",0))
-                            .add("merchant_lon", transactionJsonObject.getDouble("long",0))
-                            .add("credit_card_number", Long.parseLong( transactionJsonObject.getString("cc_num","")))
-                            .add("customer_name", customerJsonObject.getString("first","") +
-                                                        " " + customerJsonObject.getString("last",""))
-                            .add("customer_city", customerJsonObject.getString("city",""))
-                            .add("customer_age_group", customerJsonObject.getString("age_group",""))
-                            .add("customer_gender", customerJsonObject.getString("gender",""))
-                            .add("customer_lat", customerJsonObject.getFloat("latitude",0))
-                            .add("customer_lon", customerJsonObject.getFloat("longitude",0))
-                            .add("distance_from_home", distanceKms)
-                            .add("category_code", merchantJsonObject.getInt("category_code",0))
-                            .add("transaction_weekday_code",weekday)
-                            .add("transaction_hour_code",hour)
-                            .add("transaction_month_code",month)
-                            .add("gender_code", customerJsonObject.getInt("gender_code",0))
-                            .add("customer_zip_code", customerJsonObject.getInt("zip_code",0))
-                            .add("customer_city_population", customerJsonObject.getInt("city_pop",0))
-                            .add("customer_job_code", customerJsonObject.getInt("job_code",0))
-                            .add("customer_age", customerJsonObject.getInt("age",0))
-                            .add("customer_setting_code", customerJsonObject.getInt("setting_code",0))
-                            .add("customer_age_group_code", customerJsonObject.getInt("age_group_code",0))
-                            .add("transaction_processing_total_time", 0);
-                    return  jsonFraudDetectionRequest;});
-
-
-        //Time to Call the Python Fraud Detection Model and get a prediction!
-        // Store the returned prediction in "predictionResult" MAP
-        PythonServiceConfig pythonServiceConfig = getPythonServiceConfig("fraud_handler");
-
-        SinkStage predictFraud = getFraudPredictions
-                //from JsonObject to string for mapUsingPython
-                .map(predictionRequest -> predictionRequest.toString())
-                // Run Python Model
-                .apply(mapUsingPython(pythonServiceConfig))
-                .setLocalParallelism(8)
-                .setName("PREDICT (Python)- Fraud Probability")
-                //From String back into a JSONObject
-                .map(predictionRequest -> new JsonObject(Json.parse(predictionRequest).asObject()))
-                // Sink JSONObject to Hazelcast fast data store (MAP)
-                .map (predictionJSON -> {
-                   String key = predictionJSON.getString("transaction_number","") + "@" + String.valueOf(predictionJSON.getLong("credit_card_number",0));
-                    HazelcastJsonValue jv = new HazelcastJsonValue(predictionJSON.toString());
-                    return Tuple2.tuple2(key,jv);
-                })
-                .writeTo(Sinks.map("predictionResult"));
-        return pipeline;
-
-        //.writeTo(Sinks.logger());
-
-    }
-
-    private static HazelcastInstance getHazelClient(String hazelcastClusterMemberAddresses)  {
-
-        ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setClusterName("dev");
-        clientConfig.getNetworkConfig().addAddress(hazelcastClusterMemberAddresses);
-
-        //Start the client
-        //HazelcastInstance client = HazelcastClient.newHazelcastClient(clientConfig);
-        HazelcastInstance client = Hazelcast.bootstrappedInstance();
-
-        return client;
-    }
-
     private static Double calculateDistanceKms(double lat1, double long1, double lat2, double long2) {
         return org.apache.lucene.util.SloppyMath.haversinMeters(lat1, long1, lat2, long2) / 1_000;
-    }
-    protected static PythonServiceConfig getPythonServiceConfig(String name) throws Exception {
-        File temporaryDir = getTemporaryDir(name);
-
-        PythonServiceConfig pythonServiceConfig = new PythonServiceConfig();
-        pythonServiceConfig.setBaseDir(temporaryDir.toString());
-        pythonServiceConfig.setHandlerFunction("transform_list");
-        pythonServiceConfig.setHandlerModule(name);
-
-        return pythonServiceConfig;
-    }
-    private static File getTemporaryDir(String name) throws Exception {
-        Path targetDirectory = Files.createTempDirectory(name);
-        targetDirectory.toFile().deleteOnExit();
-
-        // These files will be copied over to the python environment created by hazelcast
-        String[] resourcesToCopy = { name + ".py", "lgbm_model_no_merchant_cc_num","requirements.txt"};
-        for (String resourceToCopy : resourcesToCopy) {
-            try (InputStream inputStream = Main.class.getResourceAsStream(resourceToCopy)) {
-                if (inputStream == null) {
-                    System.out.println(resourceToCopy + ": NOT FOUND in Jar's src/main/resources");
-                } else {
-                    System.out.println(resourceToCopy + ": FOUND  in Jar");
-                    Path targetFile =
-                            Paths.get(targetDirectory + File.separator + resourceToCopy);
-                    Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-
-        return targetDirectory.toFile();
     }
     private static double retrieveFeatureByName(HazelcastJsonValue existingStreamingFeatureValue, String currentTransactionString, String featureName, long aggregationPeriodMillis) {
 
@@ -449,5 +393,34 @@ public class Main {
 
         return result;
     }
+    protected static PythonServiceConfig getPythonServiceConfig(String name) throws Exception {
+        File temporaryDir = getTemporaryDir(name);
 
+        PythonServiceConfig pythonServiceConfig = new PythonServiceConfig();
+        pythonServiceConfig.setBaseDir(temporaryDir.toString());
+        pythonServiceConfig.setHandlerModule(name);
+        pythonServiceConfig.setHandlerFunction("transform_list");
+        return pythonServiceConfig;
+    }
+    private static File getTemporaryDir(String name) throws Exception {
+        Path targetDirectory = Files.createTempDirectory(name);
+        targetDirectory.toFile().deleteOnExit();
+
+        // These files will be copied over to the python environment created by hazelcast
+        String[] resourcesToCopy = { name + ".py", "sf_fraud_prediction_hazelcast.model","requirements.txt"};
+        for (String resourceToCopy : resourcesToCopy) {
+            try (InputStream inputStream = Main.class.getResourceAsStream(resourceToCopy)) {
+                if (inputStream == null) {
+                    System.out.println(resourceToCopy + ": NOT FOUND in Jar's src/main/resources");
+                } else {
+                    System.out.println(resourceToCopy + ": FOUND  in Jar");
+                    Path targetFile =
+                            Paths.get(targetDirectory + File.separator + resourceToCopy);
+                    Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        return targetDirectory.toFile();
+    }
 }

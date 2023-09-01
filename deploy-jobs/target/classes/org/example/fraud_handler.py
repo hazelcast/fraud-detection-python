@@ -3,10 +3,11 @@ import datetime
 import lightgbm as lgbm
 
 #load model from disk
-fraud_model = lgbm.Booster(model_file='lgbm_model_no_merchant_cc_num')
+fraud_model = lgbm.Booster(model_file='sf_fraud_prediction_hazelcast.model')
 
 FEATURE_NAMES = ['category_code','amount','transaction_weekday_code','transaction_month_code','transaction_hour_code','gender_code',
-    'customer_zip_code','customer_city_population','customer_job_code','customer_age','customer_setting_code','customer_age_group_code','distance_from_home']
+    'customer_zip_code','customer_city_population','customer_job_code','customer_age','customer_setting_code','customer_age_group_code',
+    'distance_from_home','transactions_last_24_hours','transactions_last_week','amount_spent_last_24_hours']
 
 def request_to_model_input(fr):
     result = []
@@ -33,7 +34,7 @@ def transform_list(input_list):
     final_results = []
     for (req, prediction) in zip (fraud_requests,fraud_predictions):
         req['fraud_probability'] = prediction
-        req['fraud_model_prediction'] = 1 if prediction > 0.5 else 0
+        req['fraud_model_prediction'] = 1 if prediction >= 0.5 else 0
         req['inference_time_ns'] = (datetime.datetime.now().microsecond - start) * 1000
         final_results.append(req)
 
