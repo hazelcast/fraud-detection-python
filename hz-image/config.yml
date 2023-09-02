@@ -10,10 +10,5 @@ hazelcast:
       partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
     customers:
       partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
-    transactions:
-      time-to-live-seconds: 300
+    streaming-features:
       partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
-      event-journal:
-        enabled: true
-        capacity: 1000000
-        time-to-live-seconds: 300

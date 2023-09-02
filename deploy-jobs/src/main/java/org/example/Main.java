@@ -286,7 +286,7 @@ public class Main {
                     JsonObject event = new JsonObject(Json.parse(tup.getValue().toString()).asObject());
                     return event.getLong("timestamp_ms",0L);
                 },0L)
-                .setLocalParallelism(6);
+                .setLocalParallelism(10);
 
     }
     private static void addSumStreamingFeature(StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, String streamingFeatureMapName, String fieldToSum) {
@@ -338,7 +338,6 @@ public class Main {
         props.setProperty("sasl.mechanism", "PLAIN");
         props.setProperty("session.timeout.ms", "45000");
         props.setProperty("client.dns.lookup", "use_all_dns_ips");
-        props.setProperty("acks", "all");
         props.setProperty("auto.offset.reset","earliest");
 
         return props;
