@@ -13,6 +13,7 @@ import com.hazelcast.jet.kafka.KafkaSources;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.jet.python.PythonServiceConfig;
 import com.hazelcast.internal.json.Json;
+import com.hazelcast.map.IMap;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import java.io.File;
 import java.io.InputStream;
@@ -37,7 +38,7 @@ public class Main {
     private static final String MERCHANT_MAP="merchants";
     private static final String CUSTOMER_MAP="customers";
     private static final String STREAMING_FEATURE_MAP = "streaming-features";
-    private static final String PREDICTION_MAP = "predictionResult";
+    private static final String PREDICTION_RESULT_MAP = "predictionResult";
 
     public static void main(String[] args) throws Exception {
 
@@ -49,22 +50,26 @@ public class Main {
         String KAFKA_CLUSTER_ENDPOINT = env.get("KAFKA_ENDPOINT");
         HazelcastInstance client = Hazelcast.bootstrappedInstance();
         System.out.println("Connected to Hazelcast at " + HZ_ENDPOINT);
+        System.out.println("30 minutes in ms = " + MINUTES.toMillis(30));
         Properties kafkaConsumerProperties = getKafkaBrokerProperties(KAFKA_CLUSTER_ENDPOINT,KAFKA_CLUSTER_KEY,KAFKA_CLUSTER_SECRET);
 
-        //Job to calculate streaming features
-        Pipeline streamingFeaturePipeline = createStreamingFeaturesPipeline(kafkaConsumerProperties);
+        IMap<Object, Object> sf_map = client.getMap(STREAMING_FEATURE_MAP);
+        sf_map.evictAll();
+        IMap<Object, Object> prediction_map = client.getMap(PREDICTION_RESULT_MAP);
+        prediction_map.evictAll();
+        System.out.println(sf_map.size());
+        System.out.println(prediction_map.size());
+
 
         //Job to process transactions
         Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties);
 
         //Submit Jobs to Hazelcast for execution
-        submitJob(STREAMING_FEATURE_CALCULATION_JOB_NAME,streamingFeaturePipeline,client);
         submitJob(TRANSACTION_PROCESSING_JOB_NAME,transactionProcessingPipeline,client);
 
     }
     private static void submitJob(String jobName, Pipeline pipeline,HazelcastInstance client) {
         JobConfig jobConfig = getConfig(jobName);
-
         Job existingJob = client.getJet().getJob(jobName);
         if (existingJob!=null) {
             try {
@@ -74,24 +79,20 @@ public class Main {
                 System.out.println(e);
             }
         }
-        //now submit the jobs
+        //now submit the job
         client.getJet().newJob(pipeline,jobConfig);
-
     }
     private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties)  throws Exception {
         Pipeline p = Pipeline.create();
-        // Get stream of Transactions from Kafka
+        //p.setPreserveOrder(true);
+        // Get stream of Transactions from Kafka Topic
         StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties);
-
-        //log original transaction received
-        //SinkStage sendToLogger = source
-        //        .writeTo((Sinks.logger()));
 
         //1. Retrieve Current Streaming Feature values from map
         StreamStage<Tuple2<HazelcastJsonValue, JsonObject>> retrieveStreamingFeatures = source
                 .mapUsingIMap(
                         STREAMING_FEATURE_MAP,
-                        //key is credit card number
+                        //Kafka message key is credit card number
                         entry -> entry.getKey().toString(),
                         // read streaming features from map
                         (transactionTuple, streamingFeatureValues) -> {
@@ -113,13 +114,20 @@ public class Main {
                             streamingFeaturesAsJsonObject.set("transactions_last_week", transactionCountLast7Days);
                             streamingFeaturesAsJsonObject.set("amount_spent_last_24_hours", amountSpentLast24Hours);
 
-                            //return streaming features + incoming transaction tuple
                             HazelcastJsonValue streamingFeaturesJsonValue = new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
                             return Tuple2.tuple2(streamingFeaturesJsonValue, transactionJsonObject);
-                        });
+                        })
+                .setName("ENRICH - Retrieve STREAMING Feature values");
 
+        //2.a Add Branches to calculate 3 streaming features
+        //Count transactions in previous 24 hours. Emit count every 1 hour
+        addCountStreamingFeature(source,"transactions_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)),counting(),STREAMING_FEATURE_MAP);
+        //Count transactions in the previous 7 days. Emit count every 1 hour
+        addCountStreamingFeature(source,"transactions_last_week", sliding(DAYS.toMillis(7), HOURS.toMillis(1)), counting(), STREAMING_FEATURE_MAP);
+        //Sum Amount Spent in the last 24 hours. Emit sum every 1 hour
+        addSumStreamingFeature(source, "amount_spent_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)), STREAMING_FEATURE_MAP, "amt");
 
-        //2. Look up Merchant for this transaction (input Tuple <StreamingFeatures, OriginalTransaction)
+        //2.b Look up Merchant for this transaction (input Tuple <StreamingFeatures, OriginalTransaction)
         StreamStage<Tuple3<HazelcastJsonValue, JsonObject, JsonObject>> retrieveMerchantFeatures = retrieveStreamingFeatures
                 .mapUsingReplicatedMap(MERCHANT_MAP,
                         tup -> tup.getValue().getString("merchant", "none"),
@@ -150,56 +158,47 @@ public class Main {
                     JsonObject merchantJsonObject = tup.f2();
                     JsonObject customerJsonObject = tup.f3();
                     return prepareFraudPredictionRequest( streamingFeaturesJsonObject, transactionJsonObject, merchantJsonObject, customerJsonObject);
-                });
+                })
+                .setName("PREPARE - Fraud Prediction Request");
 
         //5. Time to Call the Python Fraud Detection Model and get a fraud prediction!
         PythonServiceConfig pythonServiceConfig = getPythonServiceConfig("fraud_handler");
-
-        StreamStage<JsonObject> predictFraud = preparePredictionRequest
+        StreamStage<JsonObject> fraudPrediction = preparePredictionRequest
                 //from JsonObject to string for mapUsingPython
                 .map(predictionRequest -> predictionRequest.toString())
                 // Run Python Model
                 .apply(mapUsingPython(pythonServiceConfig))
-                .setLocalParallelism(8)
+                .setLocalParallelism(10)
                 .setName("PREDICT (Python)- Fraud Probability")
                 //From String back into a JSONObject
                 .map(predictionRequest -> getJsonObject(predictionRequest));
-                /*
-                // Store Prediction in  Hazelcast fast data store (MAP)
-                .map (predictionJSON -> {
-                    String key = predictionJSON.getString("transaction_number","") + "@" + predictionJSON.getString("credit_card_number","");
-                    HazelcastJsonValue predictionJsonValue = new HazelcastJsonValue(predictionJSON.toString());
-                    return Tuple2.tuple2(key,predictionJsonValue);
-                })
-                .writeTo(Sinks.map(PREDICTION_MAP));
-        */
 
+        //6. Store fraud prediction in Hazelcast Map
+        StreamStage<Tuple2<String, HazelcastJsonValue>> storePredictionToMap = fraudPrediction
+                .map(predictionJsonObject -> {
+                    String transactionPlusCreditCardNumber = predictionJsonObject.getString("transaction_number", "") + "@" + predictionJsonObject.getString("credit_card_number", "N/A");
+                    HazelcastJsonValue transactionAndFraudPrediction = new HazelcastJsonValue(predictionJsonObject.toString());
+                    return Tuple2.tuple2(transactionPlusCreditCardNumber, transactionAndFraudPrediction);
+                });
 
-        // Last Step -> Update streaming feature map with last transaction processed timestamp
-        SinkStage updateLTPDate = retrieveStreamingFeatures
+        //7.1 Sink to PredictionResult Map
+        storePredictionToMap
+                .writeTo(Sinks.map(PREDICTION_RESULT_MAP))
+                .setLocalParallelism(10)
+                .setName("STORE - Fraud Prediction");
+
+        //7.2 Update streaming feature map with last transaction processed timestamp
+        SinkStage updateLTPDate = storePredictionToMap
                 .writeTo(Sinks.mapWithUpdating(STREAMING_FEATURE_MAP,
-                        tup -> tup.f1().getString("cc_num","none"),
+                        tup -> getJsonObject(tup.f1()).getString("credit_card_number",""),
                         (old, tup) -> {
                             //get transaction date from transaction json
                             String transactionJsonString = tup.f1().toString();
                             HazelcastJsonValue existingStreamingValues = (HazelcastJsonValue) old;
                             return updateLastTransactionDate(transactionJsonString,existingStreamingValues);
-                        }));
-
-        //log original transaction received and streaming features input StreamingFeatures(HazelcastJsonValue), TransactionJsonObject, MerchantJsonObject
-        SinkStage sendToLogger = predictFraud
-                .map(request ->  request.toString())
-                .writeTo((Sinks.logger()));
-
-                /*.map (tup -> {
-                    String output = "\n transaction = " + tup.f1().toString();
-                    output+= "\n streaming features = " + tup.f0().toString();
-                    output+= "\n merchant features = " + tup.f2().toString();
-                    output+= "\n customer features = " + tup.f3().toString();
-
-                    return output;
-                })*/
-
+                        }))
+                .setLocalParallelism(10)
+                .setName("UPDATE - Last Transaction Processed date");
 
         return p;
     }
@@ -264,28 +263,13 @@ public class Main {
         return new HazelcastJsonValue(newJsonObject.toString());
 
     }
-    private static Pipeline createStreamingFeaturesPipeline(Properties kafkaConsumerProperties) {
-        //Create new Pipeline
-        Pipeline p = Pipeline.create();
-        // Get stream of Transactions from Kafka (Map CC_NUM, transactionJsonString)
-        StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties);
-        //Count transactions in the last 1 Day. Emit count every 1 hour
-        addCountStreamingFeature(source,"transactions_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)),counting(),STREAMING_FEATURE_MAP);
-
-        //Count transactions in the last Week. Emit count every half hour
-        addCountStreamingFeature(source,"transactions_last_week", sliding(DAYS.toMillis(7), MINUTES.toMillis(30)), counting(), STREAMING_FEATURE_MAP);
-
-        //Sum Amount Spent in the last 24 hours. Emit sum every 1 hour
-        addSumStreamingFeature(source, "amount_spent_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)), STREAMING_FEATURE_MAP, "amt");
-        return p;
-    }
     private static StreamStage<Map.Entry<Object,Object>> sourceTransactionsFromKafka(Pipeline p, Properties kafkaConsumerProperties) {
         return p.readFrom(KafkaSources.kafka(kafkaConsumerProperties,"transactions"))
                 //Use transaction timestamp
                 .withTimestamps(tup -> {
                     JsonObject event = new JsonObject(Json.parse(tup.getValue().toString()).asObject());
                     return event.getLong("timestamp_ms",0L);
-                },0L)
+                    }, MINUTES.toMillis(30))
                 .setLocalParallelism(10);
 
     }
@@ -306,16 +290,16 @@ public class Main {
                             JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
                             streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
                             return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
-                        }));
+                        }))
+                .setLocalParallelism(10);
     }
     private static void addCountStreamingFeature (StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, AggregateOperation1 aggregateOperation, String streamingFeatureMapName) {
-
         //Count events over a window of time
         StreamStage<KeyedWindowResult<Object, Long>> featureAggregation = streamSource
                 .groupingKey(Map.Entry::getKey)
                 .window(windowDefinition)
                 .aggregate(aggregateOperation)
-                .setLocalParallelism(6);
+                .setLocalParallelism(10);
 
         // Update "streaming-features" map with count at every window
         featureAggregation
@@ -325,7 +309,8 @@ public class Main {
                             JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
                             streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
                             return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
-                        }));
+                        }))
+                .setLocalParallelism(10);
     }
     private static Properties getKafkaBrokerProperties (String bootstrapServers, String clusterKey, String clusterSecret) {
         Properties props = new Properties();
@@ -339,7 +324,6 @@ public class Main {
         props.setProperty("session.timeout.ms", "45000");
         props.setProperty("client.dns.lookup", "use_all_dns_ips");
         props.setProperty("auto.offset.reset","earliest");
-
         return props;
     }
     private static JsonObject getJsonObject(HazelcastJsonValue existingValue) {

@@ -2,9 +2,9 @@ hazelcast:
   jet:
     enabled: true
     resource-upload-enabled: true
-  network:
-    rest-api:
-      enabled: true
+  #network:
+  #  rest-api:
+  #    enabled: true
   map:
     predictionResult:
       partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
