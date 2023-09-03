@@ -53,15 +53,13 @@ public class Main {
         System.out.println("30 minutes in ms = " + MINUTES.toMillis(30));
         Properties kafkaConsumerProperties = getKafkaBrokerProperties(KAFKA_CLUSTER_ENDPOINT,KAFKA_CLUSTER_KEY,KAFKA_CLUSTER_SECRET);
 
+        //Clear Streaming feature and prediction result maps
         IMap<Object, Object> sf_map = client.getMap(STREAMING_FEATURE_MAP);
-        sf_map.evictAll();
         IMap<Object, Object> prediction_map = client.getMap(PREDICTION_RESULT_MAP);
+        sf_map.evictAll();
         prediction_map.evictAll();
-        System.out.println(sf_map.size());
-        System.out.println(prediction_map.size());
 
-
-        //Job to process transactions
+        //Job to process transactions and calculate streaming features at the same time
         Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties);
 
         //Submit Jobs to Hazelcast for execution
