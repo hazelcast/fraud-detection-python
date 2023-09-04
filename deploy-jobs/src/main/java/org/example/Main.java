@@ -1,5 +1,7 @@
 package org.example;
 
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
@@ -33,7 +35,6 @@ import static java.util.concurrent.TimeUnit.*;
 import static java.util.concurrent.TimeUnit.HOURS;
 
 public class Main {
-    private static final String STREAMING_FEATURE_CALCULATION_JOB_NAME="fraud-detection-streaming-features-calculation";
     private static final String TRANSACTION_PROCESSING_JOB_NAME="fraud-detection-transaction-processing-ml";
     private static final String MERCHANT_MAP="merchants";
     private static final String CUSTOMER_MAP="customers";
@@ -45,25 +46,22 @@ public class Main {
         // get a client connection to Hazelcast
         Map<String, String> env = System.getenv();
         String HZ_ENDPOINT = env.get("HZ_ENDPOINT");
+        //HazelcastInstance client = Hazelcast.bootstrappedInstance();
+        HazelcastInstance client = getHazelClient(HZ_ENDPOINT);
+
+        //Kafka Environment variables to source transactions from
         String KAFKA_CLUSTER_KEY = env.get("KAFKA_CLUSTER_KEY");
         String KAFKA_CLUSTER_SECRET = env.get("KAFKA_CLUSTER_SECRET");
         String KAFKA_CLUSTER_ENDPOINT = env.get("KAFKA_ENDPOINT");
-        HazelcastInstance client = Hazelcast.bootstrappedInstance();
-        System.out.println("Connected to Hazelcast at " + HZ_ENDPOINT);
-        System.out.println("30 minutes in ms = " + MINUTES.toMillis(30));
         Properties kafkaConsumerProperties = getKafkaBrokerProperties(KAFKA_CLUSTER_ENDPOINT,KAFKA_CLUSTER_KEY,KAFKA_CLUSTER_SECRET);
-
-        //Clear Streaming feature and prediction result maps
-        IMap<Object, Object> sf_map = client.getMap(STREAMING_FEATURE_MAP);
-        IMap<Object, Object> prediction_map = client.getMap(PREDICTION_RESULT_MAP);
-        sf_map.evictAll();
-        prediction_map.evictAll();
 
         //Job to process transactions and calculate streaming features at the same time
         Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties);
 
         //Submit Jobs to Hazelcast for execution
         submitJob(TRANSACTION_PROCESSING_JOB_NAME,transactionProcessingPipeline,client);
+
+        client.shutdown();
 
     }
     private static void submitJob(String jobName, Pipeline pipeline,HazelcastInstance client) {
@@ -403,5 +401,18 @@ public class Main {
         }
 
         return targetDirectory.toFile();
+    }
+    private static HazelcastInstance getHazelClient(String hazelcastClusterMemberAddresses)  {
+
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setClusterName("dev");
+        clientConfig.getNetworkConfig()
+                .addAddress(hazelcastClusterMemberAddresses);
+                //.setSmartRouting(false);
+        //Start the client
+        HazelcastInstance client = HazelcastClient.newHazelcastClient(clientConfig);
+
+        System.out.println("Connected to Hazelcast Cluster");
+        return client;
     }
 }

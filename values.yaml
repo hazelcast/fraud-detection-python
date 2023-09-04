@@ -4,7 +4,7 @@ image:
   pullPolicy: Always
 
 cluster:
-  memberCount: 3
+  memberCount: 4
 topologySpreadConstraints:
 - maxSkew: 1
   topologyKey: kubernetes.io/hostname
@@ -26,13 +26,6 @@ hazelcast:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
         customers:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
-        transactions:
-          time-to-live-seconds: 300
-          partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
-          event-journal:
-            enabled: true
-            capacity: 10000
-            time-to-live-seconds: 300
       network:      
         join:
           tcp-ip:

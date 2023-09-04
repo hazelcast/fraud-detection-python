@@ -1,25 +1,25 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: data-loader
-  labels:
-    app.kubernetes.io/name: data-loader
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: data-loader
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: data-loader
-    spec:
-      containers:
-        - name: data-loader
-          image: docker.io/edsandovalhz/hz-531-python-311-data-loader
-          env:
-          - name: HZ_ENDPOINT
-            value: "hz-python-hazelcast:5701"
+#apiVersion: apps/v1
+#kind: Deployment
+#metadata:
+#  name: data-loader
+#  labels:
+#    app.kubernetes.io/name: data-loader
+#spec:
+#  replicas: 1
+#  selector:
+#    matchLabels:
+#      app.kubernetes.io/name: data-loader
+#  template:
+#    metadata:
+#      labels:
+#        app.kubernetes.io/name: data-loader
+#    spec:
+#      containers:
+#        - name: data-loader
+#          image: docker.io/edsandovalhz/hz-531-python-311-data-loader
+#          env:
+#          - name: HZ_ENDPOINT
+#            value: "hz-python-hazelcast:5701"
 ---
 
 apiVersion: v1
