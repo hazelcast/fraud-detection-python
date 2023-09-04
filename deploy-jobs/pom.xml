@@ -62,7 +62,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.example.Main</mainClass>
+                            <mainClass>org.example.StreamingFeatures</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

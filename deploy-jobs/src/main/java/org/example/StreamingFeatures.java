@@ -2,7 +2,6 @@ package org.example;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.internal.json.JsonObject;
@@ -15,7 +14,6 @@ import com.hazelcast.jet.kafka.KafkaSources;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.jet.python.PythonServiceConfig;
 import com.hazelcast.internal.json.Json;
-import com.hazelcast.map.IMap;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import java.io.File;
 import java.io.InputStream;
@@ -34,7 +32,7 @@ import static com.hazelcast.jet.python.PythonTransforms.mapUsingPython;
 import static java.util.concurrent.TimeUnit.*;
 import static java.util.concurrent.TimeUnit.HOURS;
 
-public class Main {
+public class StreamingFeatures {
     private static final String TRANSACTION_PROCESSING_JOB_NAME="fraud-detection-transaction-processing-ml";
     private static final String MERCHANT_MAP="merchants";
     private static final String CUSTOMER_MAP="customers";
@@ -330,7 +328,7 @@ public class Main {
     }
     private static JobConfig getConfig(String jobName) {
         JobConfig cfg = new JobConfig().setName(jobName);
-        cfg.addClass(Main.class);
+        cfg.addClass(StreamingFeatures.class);
         return cfg;
     }
     private static Double calculateDistanceKms(double lat1, double long1, double lat2, double long2) {
@@ -388,7 +386,7 @@ public class Main {
         // These files will be copied over to the python environment created by hazelcast
         String[] resourcesToCopy = { name + ".py", "sf_fraud_prediction_hazelcast.model","requirements.txt"};
         for (String resourceToCopy : resourcesToCopy) {
-            try (InputStream inputStream = Main.class.getResourceAsStream(resourceToCopy)) {
+            try (InputStream inputStream = StreamingFeatures.class.getResourceAsStream(resourceToCopy)) {
                 if (inputStream == null) {
                     System.out.println(resourceToCopy + ": NOT FOUND in Jar's src/main/resources");
                 } else {
