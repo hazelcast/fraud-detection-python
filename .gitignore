@@ -6,3 +6,4 @@ model-training/.ipynb_checkpoints
 .vscode
 data-loader/data/transaction-stream-full.csv
 deploy-jobs/target/maven-status
+deploy-jobs/target/maven-status/
