@@ -12,6 +12,7 @@ Make sure you have
 * [gcloud](https://cloud.google.com/sdk/docs/install)
 * [Helm](https://helm.sh/docs/intro/install/) 
 * [Hazelcast CLI tool 5.3.1](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
+* Conda or any other way of creating a Python 3.11 virtual environment (venv).
 
 
 # Fraud Detection With Hazelcast 
@@ -21,14 +22,19 @@ In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast.
 
 The main components are:
 * A 3-node Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
-* A customer and merchant data loader program (written in Python) showing how to load data into Hazelcast (distributed in-memory data store)
-* A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline defines a sequence of steps to determine if an incoming transaction is potentially fraudulent. 
-* A Python transaction loader program similuating transactions being sent to Hazelcast
+* A Confluent-hosted Kafka topic storing fake credit card transaction data
+* A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline simultaneously:
+    * Calculates number of transactions in the previous 24 hours
+    * Calculates number of transactions in the previous 7 days 
+    * Calculates amount spent in the last 24 hours
+    * Calculatate and store the probability of every transaction being fraud. 
+
+    
 * Hazelcast Management Center
-* A Fraud Analytics dashboard showing transactions and fraud predictions
+* A Fraud Analytics dashboard displaying fraud predictions by customer, city and other dimensions
 
 ## Fraud Analytics Dashboard
-By the end of this demo, you will be able to visualize fraud predictions. This dashboard was built in Python and uses SQL to retrieve data from Hazelcast
+By the end of this demo, you will be able to visualize fraud predictions. This dashboard was built in Python and uses SQL to retrieve predictions ge from Hazelcast
 
 ![Fraud dashboard](./images/fraud-dashboard.png)
 
@@ -79,27 +85,6 @@ kubectl get pods
 The output should be similar to
 ![kubectl get pods](./images/pods.png)
 
-
-# STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
-Open a second Terminal window
-
-Identify your "data-loader" pod name. Check the output of `kubectl get pods`
-In the above case, it is `data-loader-6ccbb8b88b-7sjvq`
-
-Open a Terminal to this pod 
-```
-kubectl exec --stdin --tty data-loader-6ccbb8b88b-7sjvq -- /bin/bash
-```
-Within that terminal run
-```
-python feature-data-loader.py
-```
-The output should confirm that Customer and Merchant data is now stored in Hazelcast
-![kubectl get pods](./images/data-load.png)
-
-# STEP 3: Submit Real-time Inference Pipeline to Hazelcast
-Go back to your initial Terminal window. Make sure to keep the Data loader Terminal in a separate window/tab
-
 Let's grab the Hazelcast endpoint to our cluster, run
 ```
 kubectl get services
@@ -109,11 +94,44 @@ You should see the following SERVICES available
 
 Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
 
+
+# STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
+Open a second Terminal window
+```
+cd data-loader
+```
+Create a Python 3.11 virtual environment. I will use Conda
+```
+conda create --name hz-python python=3.11
+```
+Activate the environment
+```
+conda activate hz-python
+```
+Install Hazelcast Python client library on the Python environment
+```
+pip install -r requirements.txt
+```
+Load the Customer and Merchant data
+```
+python feature-data-loader.py    
+```
+
+The output should confirm that Customer and Merchant data is now stored in Hazelcast
+![kubectl get pods](./images/data-load.png)
+
+# STEP 3: Submit Real-time Inference Pipeline to Hazelcast
+Open another Terminal window. Make sure to keep the Data loader in another tab/window
+
 ## 3.1 MAC & Linux Users
-Set an environment variable
+Set environment variables
 ```
 export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
+export KAFKA_CLUSTER_KEY=<ask your kafka admin>
+export KAFKA_CLUSTER_SECRET=<ask your kafka admin>
+export KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
 ```
+NOTE: YOur Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
 
 Now you can deploy the real-time inference pipeline by running
 ```
@@ -121,7 +139,7 @@ cd deploy-jobs
 ```
 Folowed by
 ```
-hz-cli submit -t $HZ_ENDPOINT -v -c org.example.Main target/deploy-jobs-1.0-SNAPSHOT.jar 
+hz-cli submit -t $HZ_ENDPOINT -v -c org.example.StreamingFeatures target/deploy-jobs-1.0-SNAPSHOT.jar 
 ```
 
 ## 3.2  Windows Users!
@@ -136,11 +154,14 @@ cd deploy-jobs
 ```
 docker run \
     -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar \
-    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
+    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
     --rm edsandovalhz/hz-531-python-310 \
-    /usr/lib/hazelcast/bin/hz-cli submit -t <your-hz-python--service-external-ip>:5701 -c org.example.Main /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
+    /usr/lib/hazelcast/bin/hz-cli submit -t <your-hz-python--service-external-ip>:5701 -c org.example.StreamingFeatures /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
 ```
-
 
 ## What is the Real-time Inference pipeline doing?
 Your inference pipeline has now been deployed to Hazelcast. But wait, what is this pipeline doing? 
@@ -149,26 +170,18 @@ The picture below illustrates what this real-time pipeline is automating
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 
-Broadly speaking, the pipeline is processing incoming transactions. The steps:
-* **Ingest** - placing new transactions in the "transaction" map (in-memory distributed data structure in Hazelcast) triggers the execution of this pipeline
-* **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in the "customer" and "merchant" maps. This information was previosuly loaded to Hazelcast in-memory data store (in step 2)
-* **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map)
-* **Predict** - Runs the LightGBM model passing the required input data (transformed in the format required by the model)
-* **Act** - Stores the fraud probability returned by the model, along with the transaction data in the `predictionResult` MAP (Hazelcast in-memory) for real-time analytics
+Broadly speaking, The real-time inference pipeline orchestrates the execution of the following steps:
+* **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate and keep (in-memory) values for "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast. 
+* **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in already in Hazelcast about the "customer" and "merchant". 
+* **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map). Prepare a Fraud Detection Request combining all of the information available.
+* **Predict** - Runs a LightGBM model to get a Fraud Prediction for the transaction
+* **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics. 
 
 
 You can find a full description of the [inference pipeline here](./inference-pipeline.md)
 
 
-
-# STEP 4: Time to fire some transactions into your Hazelcast inference pipeline!
-Go back to your Data loader Terminal window
-```
-python transaction-data-loader.py data/transaction-stream-full.csv 4 5000
-```
-Note: This command will split the load into 4 processes. Each process will print out a message for every 5000 transactions loaded
-
-# STEP 5: Monitor your Inference Pipeline in Management Center
+# STEP 4: Monitor your Inference Pipeline in Management Center
 Go back to your main Terminal Window
 
 Let's grab your management center IP address
@@ -188,7 +201,7 @@ Navigate to Streaming->Jobs.
 Your Inference pipeline should be processsing transactions
 ![Man center showing real-time inference pipeline job running](./images/man-center.png)
 
-# STEP 6: Let's Visualize transactions and their fraud predictions
+# STEP 5: Let's Visualize transactions and their fraud predictions
 Go back your main terminal window
 
 Make a note of the EXTERNAL-IP for your fraud dashboard service. Look for the `fraud-dashboard` service. 
@@ -219,7 +232,6 @@ Finally,
 # Don't forget to DELETE Your Kubernetes cluster
 to avoid unnecesary GKE/Cloud bills!
 
-
 # WANT TO LEARN MORE?
 
 ## How was the Feature and Transaction Data Loaded into Hazelcast?
@@ -235,7 +247,7 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 Using a fictional credit card transaction dataset and the LightGBM framework. [Check out this Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing)
 The notebook describes most of the training process. You will notice that 
 * It only uses 50% of the original dataset for training and 
-* it drops a few features 
+* it drops a few features so you can use a free Google Colab 
 
 This was done so you can train a similar model for free on Google Colab. 
 
