@@ -111,6 +111,7 @@ public class StreamingFeatures {
                             HazelcastJsonValue streamingFeaturesJsonValue = new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
                             return Tuple2.tuple2(streamingFeaturesJsonValue, transactionJsonObject);
                         })
+                .setLocalParallelism(10)
                 .setName("ENRICH - Retrieve STREAMING Feature values");
 
         //2.a Add Branches to calculate 3 streaming features
@@ -182,17 +183,14 @@ public class StreamingFeatures {
                 .setName("STORE - Fraud Prediction");
 
         //7.2 Update streaming feature map with last transaction processed timestamp
-        SinkStage updateLTPDate = storePredictionToMap
-                .writeTo(Sinks.mapWithUpdating(STREAMING_FEATURE_MAP,
-                        tup -> getJsonObject(tup.f1()).getString("credit_card_number",""),
-                        (old, tup) -> {
-                            //get transaction date from transaction json
-                            String transactionJsonString = tup.f1().toString();
-                            HazelcastJsonValue existingStreamingValues = (HazelcastJsonValue) old;
-                            return updateLastTransactionDate(transactionJsonString,existingStreamingValues);
-                        }))
+
+        storePredictionToMap
+                .writeTo(Sinks.mapWithEntryProcessor(STREAMING_FEATURE_MAP,
+                    entry -> getJsonObject( entry.getValue()).getString("credit_card_number",""),
+                    entry -> new UpdateStreamingFeatureValueProcessor("last_transaction_date", getJsonObject( entry.getValue()).getLong("timestamp_ms",-1L))))
                 .setLocalParallelism(10)
                 .setName("UPDATE - Last Transaction Processed date");
+
 
         return p;
     }
@@ -246,17 +244,7 @@ public class StreamingFeatures {
 
         return  fraudPredictionRequest;
     }
-    private static HazelcastJsonValue updateLastTransactionDate(String transactionJsonString,HazelcastJsonValue oldFeatureValues ) {
 
-        JsonObject transactionJsonObject = new JsonObject(Json.parse(transactionJsonString).asObject());
-        long current_transaction_date_ms = transactionJsonObject.getLong("timestamp_ms", -1l);
-
-        //use this value to set last transaction date in map
-        JsonObject newJsonObject = getJsonObject(oldFeatureValues);
-        newJsonObject.set("last_transaction_date", current_transaction_date_ms);
-        return new HazelcastJsonValue(newJsonObject.toString());
-
-    }
     private static StreamStage<Map.Entry<Object,Object>> sourceTransactionsFromKafka(Pipeline p, Properties kafkaConsumerProperties) {
         return p.readFrom(KafkaSources.kafka(kafkaConsumerProperties,"transactions"))
                 //Use transaction timestamp
@@ -274,18 +262,16 @@ public class StreamingFeatures {
                 .window(windowDefinition)
                 .aggregate(summingDouble(input -> {
                     return (new JsonObject(Json.parse(input.getValue().toString()).asObject()).getDouble(fieldToSum, 0));
-                }));
+                }))
+                .setLocalParallelism(10);;
 
-        // Update "streaming-features" map with sum amt at every window
+        //Update "streaming-features" map with sum amt at every window -- AFTER (with EntryProcessor)
         featureAggregation
-                .writeTo(Sinks.mapWithUpdating(streamingFeatureMapName,
-                        kwr -> kwr.getKey().toString(),
-                        (old, entry) -> {
-                            JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
-                            streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
-                            return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
-                        }))
-                .setLocalParallelism(10);
+                .writeTo(Sinks.mapWithEntryProcessor(streamingFeatureMapName,
+                    entry -> entry.getKey().toString(),
+                    entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().doubleValue())))
+                .setLocalParallelism(10)
+                .setName("Updating STREAMING FEATURE MAP: " + featureName);
     }
     private static void addCountStreamingFeature (StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, AggregateOperation1 aggregateOperation, String streamingFeatureMapName) {
         //Count events over a window of time
@@ -295,16 +281,14 @@ public class StreamingFeatures {
                 .aggregate(aggregateOperation)
                 .setLocalParallelism(10);
 
-        // Update "streaming-features" map with count at every window
+
+        // Update "streaming-features" map with count at every window - (AFTER With Entry Processor)
         featureAggregation
-                .writeTo(Sinks.mapWithUpdating(streamingFeatureMapName,
-                        kwr -> kwr.getKey().toString(),
-                        (old, entry) -> {
-                            JsonObject streamingFeaturesAsJsonObject = getJsonObject((HazelcastJsonValue) old);
-                            streamingFeaturesAsJsonObject.set(featureName, entry.getValue().doubleValue());
-                            return new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
-                        }))
-                .setLocalParallelism(10);
+                .writeTo(Sinks.mapWithEntryProcessor(streamingFeatureMapName,
+                        entry -> entry.getKey().toString(),
+                        entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().longValue())))
+                .setLocalParallelism(10)
+                .setName("Updating STREAMING FEATURE MAP: " + featureName);
     }
     private static Properties getKafkaBrokerProperties (String bootstrapServers, String clusterKey, String clusterSecret) {
         Properties props = new Properties();
@@ -329,6 +313,7 @@ public class StreamingFeatures {
     private static JobConfig getConfig(String jobName) {
         JobConfig cfg = new JobConfig().setName(jobName);
         cfg.addClass(StreamingFeatures.class);
+        cfg.addClass(UpdateStreamingFeatureValueProcessor.class);
         return cfg;
     }
     private static Double calculateDistanceKms(double lat1, double long1, double lat2, double long2) {

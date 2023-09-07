@@ -21,6 +21,10 @@ RUN wget -qO - https://repository.hazelcast.com/api/gpg/key/public | gpg --dearm
 RUN echo "deb [signed-by=/usr/share/keyrings/hazelcast-archive-keyring.gpg] https://repository.hazelcast.com/debian stable main" | tee -a /etc/apt/sources.list
 RUN apt update -y && apt install -y hazelcast=5.3.1
 
+# Copy Pipeline and EntryProcessor classes to server classpath
+#COPY ./../deploy-jobs/target/deploy-jobs-1.0-SNAPSHOT.jar ./lib/
+COPY deploy-jobs-1.0-SNAPSHOT.jar ./lib/
+
 #Install Python 3.10
 RUN apt-get install -y software-properties-common
 RUN apt update -y 
