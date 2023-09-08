@@ -208,7 +208,7 @@ Your Inference pipeline should be processsing transactions
 Go back your main terminal window
 
 Make a note of the EXTERNAL-IP for your fraud dashboard service. Look for the `fraud-dashboard` service. 
-In this example, it is `34.105.167.221:8501`
+In this example, it is `35.242.180.47:8501`
 
 Open a Browser to this location
 ![Fraud dashboard](./images/fraud-dashboard.png)
@@ -221,7 +221,7 @@ FROM predictionResult
 where fraud_probability > 0.7 and customer_name='Carol Serrano'
 LIMIT 200
 ```
-Press CTRL+ENTER to execute the SQL
+Press CMD+ENTER to execute the SQL
 
 Enjoy!
 
