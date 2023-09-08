@@ -103,7 +103,7 @@ export KAFKA_CLUSTER_KEY=<ask your kafka admin>
 export KAFKA_CLUSTER_SECRET=<ask your kafka admin>
 export KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
 ```
-NOTE: YOur Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
+NOTE: Your Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
 
 
 # STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
@@ -124,7 +124,7 @@ Install Hazelcast Python client library on the Python environment
 ```
 pip install -r requirements.txt
 ```
-## Activate your virtual environment (if you have previously created)
+## Activate your virtual environment (if you have previously created one)
 Activate the environment
 ```
 conda activate hz-python
@@ -246,12 +246,13 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 ## How was the LightGBM model trained? 
 
 Using a fictional credit card transaction dataset and the LightGBM framework. 
+
 This [Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing) shows a very similar trainning process
 
 When you execute all Cells in the notebook, you can download the trained model
 ![Download trained Model from Colab](./images/download-model.png)
 
-## How was the LightGBM model used to score transactions in a Hazelcast?
+## How was the LightGBM model used to score transactions?
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function.
 
