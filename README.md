@@ -18,7 +18,7 @@ Make sure you have
 # Fraud Detection With Hazelcast 
 In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast. 
 
-![Real-time Fraud Detection Demo Set up](./images/fraud_kafka_demo_set-up)
+![Real-time Fraud Detection Demo Set up](./images/fraud_kafka_demo_set-up.png)
 
 The main components are:
 * A 3-node Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
