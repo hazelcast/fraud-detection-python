@@ -20,7 +20,7 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             __key VARCHAR,
             transaction_number VARCHAR,
             transaction_date VARCHAR,
-            amount DECIMAL,
+            amount DOUBLE,
             merchant VARCHAR,
             merchant_lat DOUBLE,
             merchant_lon DOUBLE,
@@ -31,10 +31,13 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             customer_gender VARCHAR,
             customer_lat DOUBLE,
             customer_lon DOUBLE,
-            distance_from_home REAL,
+            distance_from_home DOUBLE,
             fraud_model_prediction INT,
             fraud_probability DOUBLE,
-            inference_time_ns BIGINT
+            inference_time_ns BIGINT,
+            transactions_last_24_hours INT,
+            transactions_last_week INT,
+            amount_spent_last_24_hours DOUBLE
             )
             TYPE IMap
             OPTIONS (
@@ -44,7 +47,7 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             ).result()
     return client
 
-@st.cache_data
+#@st.cache_data
 def get_df(_client, sql_statement, date_cols):
     #mapping hazelcast SQL Types to Pandas dtypes
     #https://hazelcast.readthedocs.io/en/stable/api/sql.html#hazelcast.sql.SqlColumnType.VARCHAR
@@ -85,7 +88,7 @@ def get_df(_client, sql_statement, date_cols):
     
     return df
 
-#@st.cache_data
+@st.cache_data
 def get_dashboard_totals(fraud_probability_threshold):
     result = {}
     sql_statement = 'SELECT count(*) as total_records, sum(amount) as total_amount, avg(amount) as avg_amount, avg(distance_from_home) as avg_distance_km FROM predictionResult LIMIT 1'
@@ -103,7 +106,7 @@ def get_dashboard_totals(fraud_probability_threshold):
             avg(amount) as potential_fraud_per_transaction, 
             avg(distance_from_home) as avg_distance_in_potential_fraud_transaction
             FROM predictionResult 
-            WHERE fraud_probability > ? 
+            WHERE fraud_probability > ?
             LIMIT 1
         '''
     sql_result = client.sql.execute(sql_statement,(fraud_probability_threshold)).result()
@@ -167,11 +170,11 @@ col1_f, col2_f, col3_f,col4_f  = st.columns(4)
 with col1_f:    
     st.metric('Total Transactions',totals['potential_fraud_records'],help='SELECT count(*) from predictionResult where fraud_probability > ' + str(probability_threshold) + '%')
 with col2_f:
-    st.metric('Total Amount ', totals['potential_fraud_amount'],help='Total $ Amount of Predicted Fraud in Transactions with Fraud probability > ' + str(probability_threshold) + '%')
+    st.metric('Total Amount ', totals['potential_fraud_amount'],help='Total $ Amount of Predicted Fraud in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
 with col3_f: 
     avg_amount_delta = round(totals['potential_fraud_per_transaction'] - totals['avg_amount'],2)
     
-    st.metric('Avg Amount per Transaction',  totals['potential_fraud_per_transaction'], avg_amount_delta,help='Avg Transaction Amount in Transactions with Fraud probability > ' + str(probability_threshold) + '%')
+    st.metric('Avg Amount per Transaction',  totals['potential_fraud_per_transaction'], avg_amount_delta,help='Avg Transaction Amount in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
 with col4_f:
     avg_distance_delta = round(totals['avg_distance_in_potential_fraud_transaction'] - totals['avg_distance_km'],2)
     st.metric('Avg Distance (km) from home', totals['avg_distance_in_potential_fraud_transaction'],avg_distance_delta,help='Distance from home in Km in Transactions with Fraud probability > ' + str(probability_threshold) + '%')
@@ -195,13 +198,15 @@ sql_statement = """
 
 df_bubble = get_df(client,sql_statement=sql_statement,date_cols=[])
 
+#scatter plot
 fig = px.scatter(df_bubble, x="total_amount", y="total_transactions",
 	         size="total_amount", color=category_selected,
-                 hover_name="fraud_probability", log_x=True, size_max = 40, width=500, height=500)
+                 hover_name="fraud_probability", log_x=False, size_max = 40, width=600, height=500)
 with col_chart1:
     st.subheader("Fraud Hotspots by " + category_selected )
-    #st.plotly_chart(fig)
     selected_points = plotly_events(fig,click_event=True,hover_event=False)
+    if selected_points:
+        selected_points = [selected_points[0]]
     
 
 #MAP chart  - #Start by getting impacted from bubble chart
@@ -217,20 +222,18 @@ if (selected_points):
 
 #query for merchant lat/lon - filter most impacted values displayed in bubble chart
 sql_statement = """
-    select merchant_lat,merchant_lon
+    select merchant_lat as lat,merchant_lon as lon
     from predictionResult 
     where fraud_probability > {fraud_threshold} and {category_selected} in ({categorical_values})
+    order by fraud_probability DESC
     limit 100
     """.format(category_selected=category_selected,categorical_values=categorical_values,fraud_threshold=fraud_threshold)
 
 df_map = get_df(client,sql_statement=sql_statement,date_cols=[])
-df_map['lat'] = df_map['merchant_lat']
-df_map['lon'] = df_map['merchant_lon']
-df_map = df_map.drop(['merchant_lat','merchant_lon'],axis=1)
 
 with col_chart2:
     st.subheader("Merchant Locations")
-    st.map(df_map)
+    st.map(df_map,use_container_width=False)
     
 #Analyst SQL Playground
 st.header('Analyst - SQL Playground','sql_playground')
@@ -260,5 +263,4 @@ count = st_autorefresh(interval = refresh_internval * 1000, limit=10000, key="re
     #customer_setting_code INT,
     #customer_age_group_code INT,
     #customer_job_code INT,
-    #category_code INT,
-    #transaction_processing_total_time BIGINT
+    #category_code INT

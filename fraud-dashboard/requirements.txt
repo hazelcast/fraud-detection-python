@@ -1,8 +1,8 @@
 hazelcast-python-client==5.3.0
-streamlit
+streamlit==1.23.1
 scipy
-plotly
-plotly-express
-streamlit_plotly_events
+plotly==5.15.0
+plotly-express==0.4.1
+streamlit_plotly_events==0.0.6
 altair
-streamlit-autorefresh
+streamlit-autorefresh==0.0.1

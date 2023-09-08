@@ -26,15 +26,11 @@ hazelcast:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
         customers:
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
-      network:      
-        join:
-          tcp-ip:
-            enabled: false
-          multicast:
-            enabled: false
+      network: 
+        join:   
           kubernetes:
             enabled: true
-            service-per-pod-label-name: external-access
+            service-per-pod-label-name: com.hazelcast/external-access
             service-per-pod-label-value: "true"
       jet:
         enabled: true
@@ -51,7 +47,7 @@ externalAccess:
   enabled: true
   service:
     labels:
-      external-access: "true"
+      com.hazelcast/external-access: "true"
 
 initContainers:
   - name: wait-for-lb
@@ -69,5 +65,5 @@ initContainers:
       - "sh"
       - "-c"
     args:
-      - until [ -n "$$(kubectl get svc -n $${POD_NAMESPACE} -l external-access="true" -ojsonpath="{.items[?(@.spec.selector.statefulset\.kubernetes\.io/pod-name==\"$${POD_NAME}\")].status.loadBalancer.ingress[0].ip}")" ]; do sleep 8; done
+      - until [ -n "$$(kubectl get svc -n $${POD_NAMESPACE} -l com.hazelcast/external-access="true" -ojsonpath="{.items[?(@.spec.selector.statefulset\.kubernetes\.io/pod-name==\"$${POD_NAME}\")].status.loadBalancer.ingress[0].ip}")" ]; do sleep 8; done
       
