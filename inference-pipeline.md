@@ -13,7 +13,7 @@ The real-time inference pipeline orchestrates the execution of the following ste
 
 
 # Creating the Inference Pipeline
-Let's walk through the Pipeline creation code in [Main.java](./deploy-jobs/src/main/java/org/example/Main.java)
+Let's walk through the Pipeline creation code in [StreamingFeatures.java](./deploy-jobs/src/main/java/org/example/StreamingFeatures.java)
 
 ## Ingest
 
