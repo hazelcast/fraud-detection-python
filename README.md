@@ -174,10 +174,10 @@ The picture below illustrates what this real-time pipeline is automating
 
 
 Broadly speaking, The real-time inference pipeline orchestrates the execution of the following steps:
-* **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate  "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast.
+* **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate  "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days" **for every credit card!**. These values are are immediately available for fraud scoring!
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in already in Hazelcast about the "customer" and "merchant". 
 * **Transform** - Prepare a Fraud Detection Request (in JSON format) combining all of the information required by the Fraud scoring model.
-* **Predict** - Executes a LightGBM model to get a Fraud Prediction for the transaction
+* **Predict** - Scores the probability of fraud for each transaction. It runs LightGBM model on each transaction.
 * **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics. 
 
 
