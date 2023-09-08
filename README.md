@@ -12,22 +12,22 @@ Make sure you have
 * [gcloud](https://cloud.google.com/sdk/docs/install)
 * [Helm](https://helm.sh/docs/intro/install/) 
 * [Hazelcast CLI tool 5.3.1](https://docs.hazelcast.com/hazelcast/5.2/getting-started/install-hazelcast#using-the-binary)
-* Conda or any other way of creating a Python 3.11 virtual environment (venv).
+* [Conda](https://conda.io/projects/conda/en/stable/user-guide/install/index.html) or any other way of creating a Python 3.11 virtual environment (venv)
 
 
 # Fraud Detection With Hazelcast 
 In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast. 
 
-![Real-time Fraud Detection Demo Set up](./images/set-up.png)
+![Real-time Fraud Detection Demo Set up](./images/fraud_kafka_demo_set-up)
 
 The main components are:
 * A 3-node Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
-* A Confluent-hosted Kafka topic storing fake credit card transaction data
-* A client Java program to define and submit the real-time inference pipeline to Hazelcast. This pipeline simultaneously:
+* A Confluent-hosted Kafka Topic storing fake credit card transactions
+* A client Java program to define and submit a real-time inference pipeline to Hazelcast. For every transaction, this pipeline simultaneously:
     * Calculates number of transactions in the previous 24 hours
     * Calculates number of transactions in the previous 7 days 
     * Calculates amount spent in the last 24 hours
-    * Calculatate and store the probability of every transaction being fraud. 
+    * Calculatate and store the fraud probability using a machine learning model
 
     
 * Hazelcast Management Center
@@ -94,6 +94,15 @@ You should see the following SERVICES available
 
 Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
 
+Set environment variables
+```
+export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
+export KAFKA_CLUSTER_KEY=<ask your kafka admin>
+export KAFKA_CLUSTER_SECRET=<ask your kafka admin>
+export KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
+```
+NOTE: YOur Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
+
 
 # STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
 Open a second Terminal window
@@ -121,21 +130,11 @@ The output should confirm that Customer and Merchant data is now stored in Hazel
 ![kubectl get pods](./images/data-load.png)
 
 # STEP 3: Submit Real-time Inference Pipeline to Hazelcast
-Open another Terminal window. Make sure to keep the Data loader in another tab/window
 
 ## 3.1 MAC & Linux Users
-Set environment variables
+You can deploy the real-time inference pipeline by running
 ```
-export HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701
-export KAFKA_CLUSTER_KEY=<ask your kafka admin>
-export KAFKA_CLUSTER_SECRET=<ask your kafka admin>
-export KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
-```
-NOTE: YOur Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
-
-Now you can deploy the real-time inference pipeline by running
-```
-cd deploy-jobs
+cd ../deploy-jobs
 ```
 Folowed by
 ```
