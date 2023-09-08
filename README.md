@@ -85,16 +85,18 @@ Wait 3-5 minutes and **ALL 5 PODS** should be **RUNNING**
 kubectl get pods
 ```
 The output should be similar to
+
 ![kubectl get pods](./images/pods.png)
 
-Let's grab the Hazelcast endpoint to our cluster, run
+Let's grab the Hazelcast endpoint to our cluster with
 ```
 kubectl get services
 ```
 You should see the following SERVICES available
+
 ![kubectl get services](./images/services.png)
 
-Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.89.10.163`
+Make a note of the EXTERNAL-IP for your Hazelcast cluster. Look for the `hz-python-hazelcast` service. In this example, it is `34.147.181.169`
 
 Set environment variables
 ```
@@ -104,7 +106,6 @@ export KAFKA_CLUSTER_SECRET=<ask your kafka admin>
 export KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
 ```
 NOTE: Your Kafka admin had previously created a Confluent Kafka Cluster with a topic (10 partitions) holding the transactions that will be run through the Hazelcast real-time inference pipeline
-
 
 # STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
 
