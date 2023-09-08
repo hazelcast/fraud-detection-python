@@ -17,41 +17,37 @@ Let's walk through the Pipeline creation code in [Main.java](./deploy-jobs/src/m
 
 ## Ingest
 
-### Java
-This Hazelcast Pipeline is triggered when a new transaction arrives in the "transactions" map.
-![Ingest](./images/create-pipeline.png)
+### Java - Start of Stream processsing
+This Hazelcast Pipeline starts as transactions start streaming through the `transactions` Kafka topic 
+![Ingest - Pipeline Start](./images/create-pipeline.png)
+![Ingest - Source Transactions](./images/source-transactions.png)
+
+### Java - Calculating Streaming Features
+As transactions start flowing, a number of "streaming features" such as "transactions in the last 24 hours", "amount spent in the last 24 hours" and "transactions in the last 7 days" are caclculated FOR EACH CREDIT CARD number!
+![Ingest - Streaming Features](./images/streaming-features.png)
+
 
 ## Enrich 
 The credit card on the incoming transaction is used to look up Customer feature data stored in the "customers" map.
-
 Similarly, the merchant code is used to look up merchant feature data stored in the "merchants" map.
 
-![Enrich](./images/feature-look-up.png)
+![Enrich](./images/enrich-customer-merchant.png)
 
 ## Transform
-Here we calculate the "distance from home" by taking the distance between:
-* The customer Lat/Lon stored in his customer profile
-* The Lat/Lon reported on the incoming transaction
 
-![Transform](./images/real-time-feature.png)
-
-## Predict
+## Prepare Prediction Request and Run it in Python
 
 In order to use Python in this Pipeline, we need to prepare a single String input. Here, the transaction, looked up values and "distance from home" stored as a String.
-![Predict](./images/python-input-string.png)
 
 Here we call `mapUsingPython` and set up some important parameters for the Python execution environment
-![Predict](./images/python-execution.png)
+![Predict](./images/prepare-run-python-model.png)
 
 ### Python
 
 Here is the actual Python code that loads the model and serves predictions.  
 
-By default, Hazelcast will look for the `transform_list()` method within the Python module declared. In this case, it is [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py). Hazelcast will send incoming scoring request to each Python instance created (with `localParalellism`)
+By default, Hazelcast will look for the `transform_list()` method within the Python module declared. 
+In this case, it is [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py). 
+
+Each Hazelcast member is running a number of Python instances as specified in (`localParalellism`). In our case, our 3-member cluster would have a total of 30 Python process instances running across all three members!
 ![Predict](./images/python-ml-code.png)
-
-
-# Submitting the Pipeline to Hazelcast (Java)
-
-In [Main.java](./deploy-jobs/src/main/java/org/example/Main.java), the `main()` method shows how to submit the inference pipeline to every member in a Hazelcast cluster. The inference pipeline will run in the same member holding the "customer" feature data. This is the key to achieve high throughput and low-latency!
-![Submit pipeline](./images/submit-pipeline.png)

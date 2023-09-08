@@ -21,17 +21,19 @@ In this demo, you will deploy a Real-time Fraud Detection Solution to Hazelcast.
 ![Real-time Fraud Detection Demo Set up](./images/fraud_kafka_demo_set-up.png)
 
 The main components are:
-* A 3-node Hazelcast cluster storing fake customer and merchant data (in memory) and running a fraud detection model (written in Python using the LightGBM framework)
 * A Confluent-hosted Kafka Topic storing fake credit card transactions
-* A client Java program to define and submit a real-time inference pipeline to Hazelcast. For every transaction, this pipeline simultaneously:
+* A 3-node Hazelcast cluster that
+    * Subscribes to the Kafka `transaction` topic (data in motion)
+    * Enriches transactions with customer and merchant data (data at rest)
+    * Executes a transaction processing pipeline, which includes running a Python ML model
+* A Java client that defines and submits a real-time inference pipeline to Hazelcast for distributed execution. For every transaction, this pipeline simultaneously:
     * Calculates number of transactions in the previous 24 hours
     * Calculates number of transactions in the previous 7 days 
     * Calculates amount spent in the last 24 hours
-    * Calculatate and store the fraud probability using a machine learning model
-
-    
-* Hazelcast Management Center
+    * Calculates fraud probability using a LIghtGBM trained model
+    * Stores the transaction and fraud prediction in memory for SQL analysis
 * A Fraud Analytics dashboard displaying fraud predictions by customer, city and other dimensions
+* Hazelcast Management Center
 
 ## Fraud Analytics Dashboard
 By the end of this demo, you will be able to visualize fraud predictions. This dashboard was built in Python and uses SQL to retrieve predictions ge from Hazelcast
@@ -105,11 +107,12 @@ NOTE: YOur Kafka admin had previously created a Confluent Kafka Cluster with a t
 
 
 # STEP 2: Load Customer and Merchant data to Hazelcast (In-Memory data store)
-Open a second Terminal window
+
 ```
 cd data-loader
 ```
-Create a Python 3.11 virtual environment. I will use Conda
+## Create a Python virtual environment (do this only 1st time you run the demo)
+If you haven't created a virtual environment for the data loader yet, create a Python 3.11 virtual environment. 
 ```
 conda create --name hz-python python=3.11
 ```
@@ -120,6 +123,11 @@ conda activate hz-python
 Install Hazelcast Python client library on the Python environment
 ```
 pip install -r requirements.txt
+```
+## Activate your virtual environment (if you have previously created)
+Activate the environment
+```
+conda activate hz-python
 ```
 Load the Customer and Merchant data
 ```
@@ -145,19 +153,13 @@ hz-cli submit -t $HZ_ENDPOINT -v -c org.example.StreamingFeatures target/deploy-
 > :warning: **Windows users, run this hz-cli command instead**: Replace `your-hz-python--service-external-ip` with the above EXTERNAL-IP 
 > address for the `hz-python-hazelcast` service
 
-First cd to the deploy-jobs directory
-```
-cd deploy-jobs
-```
-
 ```
 docker run \
     -v "$(pwd)"/target/deploy-jobs-1.0-SNAPSHOT.jar:/usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar \
     -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
-    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
-    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
-    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
-    -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
+    -e KAFKA_CLUSTER_KEY=<ask your kafka admin> \
+    -e KAFKA_CLUSTER_SECRET=<ask your kafka admin> \
+    -e KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
     --rm edsandovalhz/hz-531-python-310 \
     /usr/lib/hazelcast/bin/hz-cli submit -t <your-hz-python--service-external-ip>:5701 -c org.example.StreamingFeatures /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
 ```
@@ -170,9 +172,9 @@ The picture below illustrates what this real-time pipeline is automating
 
 
 Broadly speaking, The real-time inference pipeline orchestrates the execution of the following steps:
-* **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate and keep (in-memory) values for "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast. 
+* **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate  "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast.
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in already in Hazelcast about the "customer" and "merchant". 
-* **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map). Prepare a Fraud Detection Request combining all of the information available.
+* **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map). Prepare a Fraud Detection Request (in JSON format) combining all of the information required by the Fraud scoring model.
 * **Predict** - Runs a LightGBM model to get a Fraud Prediction for the transaction
 * **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics. 
 
@@ -243,12 +245,8 @@ With Streamlit as data visualization and Hazelcast Python issuing SQL queries. [
 
 ## How was the LightGBM model trained? 
 
-Using a fictional credit card transaction dataset and the LightGBM framework. [Check out this Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing)
-The notebook describes most of the training process. You will notice that 
-* It only uses 50% of the original dataset for training and 
-* it drops a few features so you can use a free Google Colab 
-
-This was done so you can train a similar model for free on Google Colab. 
+Using a fictional credit card transaction dataset and the LightGBM framework. 
+This [Google Colab Notebook](https://colab.research.google.com/drive/1x_j_9tZGwH__ZsdO7ECMWEY3niBuvQUG?usp=sharing) shows a very similar trainning process
 
 When you execute all Cells in the notebook, you can download the trained model
 ![Download trained Model from Colab](./images/download-model.png)
@@ -257,15 +255,9 @@ When you execute all Cells in the notebook, you can download the trained model
 
 Using Hazelcast's Pipeline API and the `MapUsingPython` function.
 
-The `MapUsingPython` function allows to run Python code on a Hazelcast cluster
+The `MapUsingPython` function allows to run distributed machine learning inference in Hazelcast. 
 
 This function can only be used in a Hazelcast Pipeline. See [more details here](./inference-pipeline.md)
-
-## Can I run this demo on my local machine (eg. No Kubernetes)?
-
-Yes, You will need Docker and a machine at least 10 CPU cores and 32GB RAM
-
-See step-by-step [instructions here](./run-demo-locally.md)
 
 
 
