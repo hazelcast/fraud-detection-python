@@ -1,8 +1,9 @@
 # Running a LightGBM (Python) Model in Hazelcast
 
-You need to include your model in a Hazelcast Pipeline. 
+You need to include your fraud scoring model in a Hazelcast Pipeline. 
 
 In this demo, the real-time inference pipeline orchestrates the execution of the following steps
+
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 * **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate and keep (in-memory) values for "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast. 
