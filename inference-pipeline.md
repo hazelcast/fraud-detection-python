@@ -9,7 +9,7 @@ In this demo, the real-time inference pipeline orchestrates the execution of the
 * **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate and keep (in-memory) values for "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast. 
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in already in Hazelcast about the "customer" and "merchant". 
 * **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map). Prepare a Fraud Detection Request combining all of the information available.
-* **Predict** - Runs a LightGBM model to get a Fraud Prediction for the transaction
+* **Predict** - Runs a LightGBM model on each transaction to obtain a fraud probability.
 * **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics
 
 # Creating the Inference Pipeline
