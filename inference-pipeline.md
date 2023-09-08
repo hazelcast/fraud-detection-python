@@ -23,7 +23,7 @@ This Hazelcast Pipeline starts as transactions start streaming through the `tran
 ![Ingest - Source Transactions](./images/source-transactions.png)
 
 ### Java - Calculating Streaming Features
-As transactions start flowing, a number of "streaming features" such as "transactions in the last 24 hours", "amount spent in the last 24 hours" and "transactions in the last 7 days" are caclculated FOR EACH CREDIT CARD number!
+As transactions start flowing, a number of "streaming features" such as "transactions in the last 24 hours", "amount spent in the last 24 hours" and "transactions in the last 7 days" are caclculated **FOR EACH CREDIT CARD number**!
 ![Ingest - Streaming Features](./images/streaming-features.png)
 
 

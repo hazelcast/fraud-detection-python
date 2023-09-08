@@ -192,6 +192,7 @@ Let's grab your management center IP address
 kubectl get services
 ```
 You should see the following SERVICES available
+
 ![kubectl get services](./images/services.png)
 
 Make a note of the EXTERNAL-IP for your management center. Look for the `hz-python-hazelcast-mancenter` service. 
