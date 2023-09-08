@@ -26,7 +26,7 @@ The main components are:
     * Subscribes to the Kafka `transaction` topic (data in motion)
     * Enriches transactions with customer and merchant data (data at rest)
     * Executes a transaction processing pipeline, which includes running a Python ML model
-* A Java client that defines and submits a real-time inference pipeline to Hazelcast for distributed execution. For every transaction, this pipeline simultaneously:
+* A Java client that defines and submits a real-time inference pipeline to Hazelcast for distributed execution. This pipeline simultaneously:
     * Calculates number of transactions in the previous 24 hours
     * Calculates number of transactions in the previous 7 days 
     * Calculates amount spent in the last 24 hours
@@ -136,6 +136,7 @@ python feature-data-loader.py
 ```
 
 The output should confirm that Customer and Merchant data is now stored in Hazelcast
+
 ![kubectl get pods](./images/data-load.png)
 
 # STEP 3: Submit Real-time Inference Pipeline to Hazelcast
@@ -160,7 +161,7 @@ docker run \
     -e HZ_ENDPOINT=<your-hz-python--service-external-ip>:5701 \
     -e KAFKA_CLUSTER_KEY=<ask your kafka admin> \
     -e KAFKA_CLUSTER_SECRET=<ask your kafka admin> \
-    -e KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin>
+    -e KAFKA_CLUSTER_ENDPOINT=<ask your kafka admin> \
     --rm edsandovalhz/hz-531-python-310 \
     /usr/lib/hazelcast/bin/hz-cli submit -t <your-hz-python--service-external-ip>:5701 -c org.example.StreamingFeatures /usr/lib/hazelcast/deploy-jobs-1.0-SNAPSHOT.jar
 ```
@@ -175,8 +176,8 @@ The picture below illustrates what this real-time pipeline is automating
 Broadly speaking, The real-time inference pipeline orchestrates the execution of the following steps:
 * **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate  "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast.
 * **Enrich** - Using credit card number and merchant code on the incoming transaction, it looks up data in already in Hazelcast about the "customer" and "merchant". 
-* **Transform** - Calculates the 'Distance from home' feature using location reported in the transaction and customer billing address stored (which is available on the "customer" map). Prepare a Fraud Detection Request (in JSON format) combining all of the information required by the Fraud scoring model.
-* **Predict** - Runs a LightGBM model to get a Fraud Prediction for the transaction
+* **Transform** - Prepare a Fraud Detection Request (in JSON format) combining all of the information required by the Fraud scoring model.
+* **Predict** - Executes a LightGBM model to get a Fraud Prediction for the transaction
 * **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics. 
 
 
