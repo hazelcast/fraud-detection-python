@@ -43,13 +43,13 @@ By the end of this demo, you will be able to visualize fraud predictions. This d
 # Let's Get Started - Clone this Repo
 ```
 git clone https://github.com/hazelcast/fraud-detection-python.git
+git checkout -b 5.3-kafka
 cd fraud-detection-python
 ```
 
 NOTE: If your clone command fails, set up a Github Personal Access token as [described here](https://www.shanebart.com/clone-repo-using-token/). 
 
 Ensure you set a reasonable expiry date and set scope to: repo, user, admin:public_key
-
 
 
 # STEP 1: Set up Your Kubernetes Cluster 
