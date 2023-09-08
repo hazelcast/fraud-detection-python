@@ -1,8 +1,8 @@
 # Running a LightGBM (Python) Model in Hazelcast
 
-You need to include your model in a Hazelcast Pipeline. It defines a sequence of processing steps that need to be carried out before and after the model scores a transaction
+You need to include your model in a Hazelcast Pipeline. 
 
-The real-time inference pipeline orchestrates the execution of the following steps
+In this demo, the real-time inference pipeline orchestrates the execution of the following steps
 ![Realtime fraud detection pipeline: behind the scenes](./images/pipeline.png)
 
 * **Ingest** - transactions are retrieved from a Kafka topic. Using Hazelcast stream processing primitives, we calculate and keep (in-memory) values for "transactions in the last 24 hours", "amount spent in previous 24 hours", transactions in the last 7 days". The values are calculated in real-time as trasactions arrive in Hazelcast. 
@@ -11,7 +11,6 @@ The real-time inference pipeline orchestrates the execution of the following ste
 * **Predict** - Runs a LightGBM model to get a Fraud Prediction for the transaction
 * **Act** - Stores the transaction and fraud probability in the `predictionResult` MAP (Hazelcast in-memory data store) for real-time fraud analytics
 
-
 # Creating the Inference Pipeline
 Let's walk through the Pipeline creation code in [StreamingFeatures.java](./deploy-jobs/src/main/java/org/example/StreamingFeatures.java)
 
@@ -19,6 +18,7 @@ Let's walk through the Pipeline creation code in [StreamingFeatures.java](./depl
 
 ### Java - Start of Stream processsing
 This Hazelcast Pipeline starts as transactions start streaming through the `transactions` Kafka topic 
+
 ![Ingest - Pipeline Start](./images/create-pipeline.png)
 ![Ingest - Source Transactions](./images/source-transactions.png)
 
@@ -44,7 +44,6 @@ Here we call `mapUsingPython` and set up some important parameters for the Pytho
 ![Predict](./images/prepare-run-python-model.png)
 
 Each Hazelcast member is running a number of Python instances as specified in (`localParalellism`). In our case, our 3-member cluster would have a total of 30 Python process instances running across all three members!
-
 
 ### Python
 
