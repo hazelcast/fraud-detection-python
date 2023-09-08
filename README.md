@@ -195,7 +195,7 @@ You should see the following SERVICES available
 ![kubectl get services](./images/services.png)
 
 Make a note of the EXTERNAL-IP for your management center. Look for the `hz-python-hazelcast-mancenter` service. 
-In this example, it is `34.89.44.29:8080`
+In this example, it is `35.189.100.64:8080`
 
 Open a Browser to this location
 
