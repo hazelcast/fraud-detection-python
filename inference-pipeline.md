@@ -29,6 +29,7 @@ As transactions start flowing, a number of "streaming features" such as "transac
 
 ## Enrich 
 The credit card on the incoming transaction is used to look up Customer feature data stored in the "customers" map.
+
 Similarly, the merchant code is used to look up merchant feature data stored in the "merchants" map.
 
 ![Enrich](./images/enrich-customer-merchant.png)
@@ -37,7 +38,7 @@ Similarly, the merchant code is used to look up merchant feature data stored in 
 
 ## Prepare Prediction Request and Run it in Python
 
-In order to use Python in this Pipeline, we need to prepare a single String input. Here, the transaction, looked up values and "distance from home" stored as a String.
+In order to use Python in this Pipeline, we need to prepare a single String input.
 
 Here we call `mapUsingPython` and set up some important parameters for the Python execution environment
 ![Predict](./images/prepare-run-python-model.png)
@@ -50,4 +51,5 @@ By default, Hazelcast will look for the `transform_list()` method within the Pyt
 In this case, it is [fraud_handler.py](./deploy-jobs/src/main/resources/org/example/fraud_handler.py). 
 
 Each Hazelcast member is running a number of Python instances as specified in (`localParalellism`). In our case, our 3-member cluster would have a total of 30 Python process instances running across all three members!
+
 ![Predict](./images/python-ml-code.png)

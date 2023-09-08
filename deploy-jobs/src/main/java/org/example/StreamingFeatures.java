@@ -78,7 +78,6 @@ public class StreamingFeatures {
     }
     private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties)  throws Exception {
         Pipeline p = Pipeline.create();
-        //p.setPreserveOrder(true);
         // Get stream of Transactions from Kafka Topic
         StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties);
 
