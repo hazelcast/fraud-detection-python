@@ -1,21 +1,23 @@
 import streamlit as st
 import pandas as pd
-import plotly.figure_factory as ff
-import plotly.graph_objects as go
 import hazelcast
+from hazelcast.sql import HazelcastSqlError
 import plotly.express as px
 import os
 from streamlit_plotly_events import plotly_events
 from streamlit_autorefresh import st_autorefresh
+import time
+import uuid
 
 st.set_page_config(layout="wide")
 
 @st.cache_resource
 def get_hazelcast_client(cluster_members=['127.0.0.1']):
-    client = hazelcast.HazelcastClient(**{'cluster_members':cluster_members})
+    ##client = hazelcast.HazelcastClient(**{'cluster_members':cluster_members})
+    client = hazelcast.HazelcastClient(cluster_members=cluster_members, use_public_ip=True,smart_routing=False)
     #run Mapping required to run SQL Queries on JSON objects in predictionResult Map
     client.sql.execute(
-                """
+        """
             CREATE OR REPLACE MAPPING predictionResult (
             __key VARCHAR,
             transaction_number VARCHAR,
@@ -35,16 +37,29 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
             fraud_model_prediction INT,
             fraud_probability DOUBLE,
             inference_time_ns BIGINT,
-            transactions_last_24_hours INT,
-            transactions_last_week INT,
-            amount_spent_last_24_hours DOUBLE
+            transactions_last_24_hours DOUBLE,
+            transactions_last_week DOUBLE,
+            amount_spent_last_24_hours DOUBLE,
+            timestamp_ms BIGINT
             )
             TYPE IMap
-            OPTIONS (
-                'keyFormat' = 'varchar',
-                'valueFormat' = 'json-flat');
-                """
-            ).result()
+              OPTIONS ('keyFormat' = 'varchar','valueFormat' = 'json-flat');
+        """).result()
+    
+    client.sql.execute(
+        """
+        CREATE OR REPLACE MAPPING total_map (
+            __key INTEGER,
+            total_records  DOUBLE,
+            total_amount  DOUBLE,
+            avg_amount  DOUBLE,
+            avg_distance_km DOUBLE
+            )
+            TYPE IMap
+              OPTIONS ('keyFormat' = 'int','valueFormat' = 'json-flat');
+
+        """).result()
+    
     return client
 
 #@st.cache_data
@@ -53,7 +68,9 @@ def get_df(_client, sql_statement, date_cols):
     #https://hazelcast.readthedocs.io/en/stable/api/sql.html#hazelcast.sql.SqlColumnType.VARCHAR
     sql_to_df_types = {0:'string',6:'float32',8:'float32',5:'int32',7:'float32',4:'int32',1:'bool'}
 
-    sql_result = client.sql.execute(sql_statement).result()
+    #sql_result = client.sql.execute(sql_statement).result()
+    sql_result = client.sql.execute(sql_statement)
+    sql_result = sql_result.result()
 
     #get column metadata from SQL result
     metadata = sql_result.get_row_metadata()
@@ -88,72 +105,111 @@ def get_df(_client, sql_statement, date_cols):
     
     return df
 
-@st.cache_data
-def get_dashboard_totals(fraud_probability_threshold):
+#@st.cache_data(ttl=30)
+def get_dashboard_totals(fraud_probability_threshold,transaction_amount):
     result = {}
-    sql_statement = 'SELECT count(*) as total_records, sum(amount) as total_amount, avg(amount) as avg_amount, avg(distance_from_home) as avg_distance_km FROM predictionResult LIMIT 1'
-    sql_result = client.sql.execute(sql_statement).result()
-    for row in sql_result:
-        result['total_records'] = row.get_object('total_records')
-        result['total_amount'] = round(float(row.get_object('total_amount')),2)
-        result['avg_amount'] = round(float(row.get_object('avg_amount')),2)
-        result['avg_distance_km'] = round(float(row.get_object('avg_distance_km')),2)
-        
-
-    sql_statement = '''
-            SELECT count(*) as potential_fraud_records,
-            sum(amount) as potential_fraud_amount, 
-            avg(amount) as potential_fraud_per_transaction, 
-            avg(distance_from_home) as avg_distance_in_potential_fraud_transaction
-            FROM predictionResult 
-            WHERE fraud_probability > ?
-            LIMIT 1
-        '''
-    sql_result = client.sql.execute(sql_statement,(fraud_probability_threshold)).result()
-    for row in sql_result:
-        result['potential_fraud_records'] = row.get_object('potential_fraud_records')
-        result['potential_fraud_amount'] = round(float(row.get_object('potential_fraud_amount')),2)
-        result['potential_fraud_per_transaction'] = round(float(row.get_object('potential_fraud_per_transaction')),2)
-        result['avg_distance_in_potential_fraud_transaction'] = round(float(row.get_object('avg_distance_in_potential_fraud_transaction')),2)
-        
     
+    #run queries as jobs and store their outputs into total_map
+    sql_statement = """
+        CREATE JOB {0} AS
+        SINK INTO total_map
+        SELECT 1, count(*) as total_records, sum(amount) as total_amount, avg(amount) as avg_amount, avg(distance_from_home) as avg_distance_km
+        FROM predictionResult
+        """
+    sql_statement = sql_statement.format('get_total_'+ str(uuid.uuid4().hex))
+    client.sql.execute(sql_statement).result()
+
+    sql_statement = """
+        CREATE JOB {0} AS
+        SINK INTO total_map
+        SELECT 2, count(*) as total_records, sum(amount) as total_amount, avg(amount) as avg_amount, avg(distance_from_home) as avg_distance_km
+        FROM predictionResult
+        WHERE fraud_probability > ? and amount >= ?
+        """
+    sql_statement = sql_statement.format('get_total_'+ str(uuid.uuid4().hex))
+    client.sql.execute(sql_statement,fraud_probability_threshold,transaction_amount).result()
+    
+    #get results from map
+    total_map = client.get_map("total_map").blocking()
+
+    #Get Overall totals
+    res = total_map.get(1).loads()
+    if res:
+        result['total_records'] = res['total_records']
+        result['total_amount'] = round(float(res['total_amount']),2) if res['total_amount'] else 0
+        result['avg_amount'] = round(float(res['avg_amount']),2) if res['avg_amount'] else 0
+        result['avg_distance_km'] = round(float(res['avg_distance_km']),2) if res['avg_distance_km'] else 0
+    
+    #Get fraud totals 
+    res = total_map.get(2).loads()
+    if res:
+        result['potential_fraud_records'] = res['total_records'] if res['total_records'] else 0
+        result['potential_fraud_amount'] = round(float(res['total_amount']),2) if res['total_amount'] else 0
+        result['potential_fraud_per_transaction'] = round(float(res['avg_amount']),2) if res['avg_amount'] else 0
+        result['avg_distance_in_potential_fraud_transaction'] = round(float(res['avg_distance_km']),2) if res['avg_distance_km'] else 0
+        
     return result
+
+@st.cache_data(ttl=60)
+def get_df_3(sql_statement_to_execute,cols):
+
+    result_data = {}
+    for col in cols:
+        result_data[col]=[]
+
+    tries = 10
+    for i in range(tries):
+        try:
+            with client.sql.execute(sql_statement_to_execute).result() as result:
+                for row in result:
+                    for col in cols:
+                        result_data[col].append(row[col])
+        except HazelcastSqlError:
+            if i < tries-1:
+                time.sleep(0.2 * (1+i))
+                continue
+        break
+
+    dataframe_result = pd.DataFrame(result_data)
+    return dataframe_result
 
 @st.cache_data
 def get_categorical_variables():
     categorical_features =['customer_name','customer_city','customer_age_group','customer_gender']
     return categorical_features
 
-
-
 #Connect to hazelcast - use env variable HZ_ENDPOINT, if provided
 hazelcast_node = os.environ['HZ_ENDPOINT']
+start = time.time()
 if hazelcast_node:
     client = get_hazelcast_client([hazelcast_node])
 else:
     client = get_hazelcast_client()
+end_time = time.time()
 
 #get categorical variable names
 categorical_features = get_categorical_variables()
 
-
 #sidebar 
-st.sidebar.header('Fraud Probability Threshold')
-probability_threshold = st.sidebar.slider('Enter Threshold',0,100,70,1)
+st.sidebar.header('Transaction Fraud Criteria')
+probability_threshold = st.sidebar.slider('Fraud Probability Above ',50,100,75,1)
+transaction_amount = st.sidebar.slider('Transactions Above (Amount)',100,10000,1000,100)
 st.sidebar.header('Key Dimensions','key dimensions')
 category_selected = st.sidebar.selectbox('', categorical_features)
-
 st.sidebar.header('Refresh Settings','refresh')
-refresh_internval = st.sidebar.slider('Auto Refresh Period (Seconds)',10,30,20,1)
-
+refresh_interval = st.sidebar.slider('Auto Refresh Period (Seconds)',3,30,15,1)
 
 #Continue Loading data
 fraud_threshold = probability_threshold / 100
-totals = get_dashboard_totals(fraud_threshold)
+start = time.time()
+totals = get_dashboard_totals(fraud_threshold,transaction_amount)
+end_time = time.time()
+
 
 #Main page title and header
 st.title('Fraud Analysis Dashboard')
-st.header('All Trasactions','tx_metrics')
+st.header('Most Recent Transactions (300k)','tx_metrics')
+
 col1, col2, col3,col4  = st.columns(4)
 with col1:
     st.metric('Total Transactions', totals['total_records'],help='SELECT count(*) from predictionResult')
@@ -183,33 +239,34 @@ with col4_f:
 st.header('Where is Potential Fraud Coming from?','key_dimensions')
 col_chart1, col_chart2 = st.columns(2)
 
-#Bubble Chart
+#Bubble Chart - SQL Statement
+start = time.time()
 sql_statement = """
     select count(*) as total_transactions, avg(fraud_probability) as fraud_probability,
         avg(distance_from_home) as distance_from_home,sum(amount) as total_amount,
         {category_selected} 
     from predictionResult 
-    where fraud_probability > {fraud_threshold} 
+    where fraud_probability > {fraud_threshold} and amount >= {transaction_amount}
     group by {category_selected}
-    order by fraud_probability DESC
-    limit 100
-    """.format(category_selected=category_selected,fraud_threshold=fraud_threshold)
+    order by total_transactions DESC
+    limit 50
+    """.format(category_selected=category_selected,fraud_threshold=fraud_threshold,transaction_amount=transaction_amount)
 
+#Bubble Chart Dataframe
+bubble_data_cols = ['total_transactions','fraud_probability','distance_from_home','total_amount',category_selected]
+df_bubble = get_df_3(sql_statement,['total_transactions','fraud_probability','distance_from_home','total_amount',category_selected])
+end_time = time.time()
 
-df_bubble = get_df(client,sql_statement=sql_statement,date_cols=[])
+#Bubble Chart
+fig = px.scatter(df_bubble, x="total_amount", y="total_transactions",size="total_amount",color=category_selected,
+                 hover_name="fraud_probability", log_y=False, log_x=False, size_max = 40, width=600, height=500)
 
-#scatter plot
-fig = px.scatter(df_bubble, x="total_amount", y="total_transactions",
-	         size="total_amount", color=category_selected,
-                 hover_name="fraud_probability", log_x=False, size_max = 40, width=600, height=500)
 with col_chart1:
     st.subheader("Fraud Hotspots by " + category_selected )
+    st.write (end_time-start)
     selected_points = plotly_events(fig,click_event=True,hover_event=False)
-    if selected_points:
-        selected_points = [selected_points[0]]
-    
 
-#MAP chart  - #Start by getting impacted from bubble chart
+#Start by getting impacted from bubble chart
 categorical_impacted = df_bubble[category_selected].to_list()
 categorical_values= '\'' + '\',\''.join(categorical_impacted) + '\''
 
@@ -220,20 +277,24 @@ if (selected_points):
     selected_value = df_bubble.loc[df_bubble['total_amount'] == total_amount_chosen ][category_selected].to_list()[0]
     categorical_values = '\'' + selected_value + '\''
 
-#query for merchant lat/lon - filter most impacted values displayed in bubble chart
-sql_statement = """
+# MAP SQL 
+start = time.time()
+map_sql_statement = """
     select merchant_lat as lat,merchant_lon as lon
     from predictionResult 
-    where fraud_probability > {fraud_threshold} and {category_selected} in ({categorical_values})
+    where fraud_probability > {fraud_threshold} and {category_selected} in ({categorical_values}) and amount >= {transaction_amount}
     order by fraud_probability DESC
-    limit 100
-    """.format(category_selected=category_selected,categorical_values=categorical_values,fraud_threshold=fraud_threshold)
+    limit 50
+    """.format(category_selected=category_selected,categorical_values=categorical_values,fraud_threshold=fraud_threshold,transaction_amount=transaction_amount)
 
-df_map = get_df(client,sql_statement=sql_statement,date_cols=[])
+df_map = get_df(client,sql_statement=map_sql_statement,date_cols=[])
+end_time = time.time()
 
 with col_chart2:
-    st.subheader("Merchant Locations")
+    st.subheader("Transaction Locations")
+    st.write (end_time-start)
     st.map(df_map,use_container_width=False)
+    
     
 #Analyst SQL Playground
 st.header('Analyst - SQL Playground','sql_playground')
@@ -247,10 +308,12 @@ if deploy_heuristic_button:
 #SQL Results
 st.header('SQL Results','data')
 if sql_statement:
+    start = time.time()
     df3 = get_df(client,sql_statement,[])
+    end_time = time.time()
     st.write(df3)
 
-count = st_autorefresh(interval = refresh_internval * 1000, limit=10000, key="refresh-counter")
+count = st_autorefresh(interval = refresh_interval * 1000, limit=10000, key="refresh-counter")
 
 #Other fields in the PredictionResult map (JSONObject)
     #transaction_weekday_code INT,

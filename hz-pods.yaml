@@ -32,7 +32,7 @@ spec:
     spec:
       containers:
         - name: fraud-dashboard
-          image: docker.io/edsandovalhz/hz-531-python-311-fraud-dashboard
+          image: edsandovalhz/hz-531-python-311-fraud-dashboard
           ports:
             - name: fb-port
               containerPort: 8501

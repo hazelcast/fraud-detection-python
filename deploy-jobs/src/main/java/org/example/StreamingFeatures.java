@@ -114,11 +114,11 @@ public class StreamingFeatures {
                 .setName("ENRICH - Retrieve STREAMING Feature values");
 
         //2.a Add Branches to calculate 3 streaming features
-        //Count transactions in previous 24 hours. Emit count every 1 hour
+        //Count transactions in previous 24 hours. Emit count every HOUR
         addCountStreamingFeature(source,"transactions_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)),counting(),STREAMING_FEATURE_MAP);
-        //Count transactions in the previous 7 days. Emit count every 1 hour
+        //Count transactions in the previous 7 days. Emit count every HOUR
         addCountStreamingFeature(source,"transactions_last_week", sliding(DAYS.toMillis(7), HOURS.toMillis(1)), counting(), STREAMING_FEATURE_MAP);
-        //Sum Amount Spent in the last 24 hours. Emit sum every 1 hour
+        //Sum Amount Spent in the last 24 hours. Emit sum every HOUR
         addSumStreamingFeature(source, "amount_spent_last_24_hours", sliding(HOURS.toMillis(24), HOURS.toMillis(1)), STREAMING_FEATURE_MAP, "amt");
 
         //2.b Look up Merchant for this transaction (input Tuple <StreamingFeatures, OriginalTransaction)
@@ -270,7 +270,7 @@ public class StreamingFeatures {
                     entry -> entry.getKey().toString(),
                     entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().doubleValue())))
                 .setLocalParallelism(10)
-                .setName("Updating STREAMING FEATURE MAP: " + featureName);
+                .setName("Update " + featureName);
     }
     private static void addCountStreamingFeature (StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, AggregateOperation1 aggregateOperation, String streamingFeatureMapName) {
         //Count events over a window of time
@@ -287,7 +287,7 @@ public class StreamingFeatures {
                         entry -> entry.getKey().toString(),
                         entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().longValue())))
                 .setLocalParallelism(10)
-                .setName("Updating STREAMING FEATURE MAP: " + featureName);
+                .setName("Update: " + featureName);
     }
     private static Properties getKafkaBrokerProperties (String bootstrapServers, String clusterKey, String clusterSecret) {
         Properties props = new Properties();
