@@ -24,7 +24,7 @@ hazelcast:
       map:
         predictionResult:
           eviction:
-            size: 100000
+            size: 200000
             eviction-policy: LFU
             max-size-policy: PER_NODE
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
@@ -41,10 +41,6 @@ hazelcast:
             - type: SORTED
               attributes:
                 - "amount"
-            - type: SORTED
-              attributes:
-                - "distance_from_home"
-            - type: HASH
               attributes:
                 - "customer_age_group"
             - type: HASH

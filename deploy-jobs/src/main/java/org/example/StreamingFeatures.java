@@ -110,7 +110,7 @@ public class StreamingFeatures {
                             HazelcastJsonValue streamingFeaturesJsonValue = new HazelcastJsonValue(streamingFeaturesAsJsonObject.toString());
                             return Tuple2.tuple2(streamingFeaturesJsonValue, transactionJsonObject);
                         })
-                .setLocalParallelism(10)
+                .setLocalParallelism(4)
                 .setName("ENRICH - Retrieve STREAMING Feature values");
 
         //2.a Add Branches to calculate 3 streaming features
@@ -129,6 +129,7 @@ public class StreamingFeatures {
                             JsonObject merchantJSON = getJsonObject((HazelcastJsonValue) merchant);
                             return Tuple3.tuple3(tup.f0(), tup.f1(), merchantJSON);
                         })
+                .setLocalParallelism(4)
                 .setName("ENRICH - Retrieve MERCHANT Features");
 
 
@@ -140,6 +141,7 @@ public class StreamingFeatures {
                             JsonObject customerJson = getJsonObject((HazelcastJsonValue) customer);
                             return Tuple4.tuple4(tup.f0(), tup.f1(), tup.f2(), customerJson);
                         })
+                .setLocalParallelism(4)
                 .setName("ENRICH - Retrieve CUSTOMER Features");
 
         //4. Prepare JSON String to be sent to Python Fraud Model
@@ -153,6 +155,7 @@ public class StreamingFeatures {
                     JsonObject customerJsonObject = tup.f3();
                     return prepareFraudPredictionRequest( streamingFeaturesJsonObject, transactionJsonObject, merchantJsonObject, customerJsonObject);
                 })
+                .setLocalParallelism(4)
                 .setName("PREPARE - Fraud Prediction Request");
 
         //5. Time to Call the Python Fraud Detection Model and get a fraud prediction!
@@ -160,12 +163,16 @@ public class StreamingFeatures {
         StreamStage<JsonObject> fraudPrediction = preparePredictionRequest
                 //from JsonObject to string for mapUsingPython
                 .map(predictionRequest -> predictionRequest.toString())
+                .setLocalParallelism(4)
+                .setName("PREPARE - Request To JSON")
                 // Run Python Model
                 .apply(mapUsingPython(pythonServiceConfig))
-                .setLocalParallelism(10)
+                .setLocalParallelism(4)
                 .setName("PREDICT (Python)- Fraud Probability")
                 //From String back into a JSONObject
-                .map(predictionRequest -> getJsonObject(predictionRequest));
+                .map(predictionRequest -> getJsonObject(predictionRequest))
+                .setName("TRANSFORM - Prediction to JSON")
+                .setLocalParallelism(4);
 
         //6. Store fraud prediction in Hazelcast Map
         StreamStage<Tuple2<String, HazelcastJsonValue>> storePredictionToMap = fraudPrediction
@@ -173,12 +180,14 @@ public class StreamingFeatures {
                     String transactionPlusCreditCardNumber = predictionJsonObject.getString("transaction_number", "") + "@" + predictionJsonObject.getString("credit_card_number", "N/A");
                     HazelcastJsonValue transactionAndFraudPrediction = new HazelcastJsonValue(predictionJsonObject.toString());
                     return Tuple2.tuple2(transactionPlusCreditCardNumber, transactionAndFraudPrediction);
-                });
+                })
+                .setName("PREPARING TO STORE PREDICTION")
+                .setLocalParallelism(4);
 
         //7.1 Sink to PredictionResult Map
         storePredictionToMap
                 .writeTo(Sinks.map(PREDICTION_RESULT_MAP))
-                .setLocalParallelism(10)
+                .setLocalParallelism(4)
                 .setName("STORE - Fraud Prediction");
 
         //7.2 Update streaming feature map with last transaction processed timestamp
@@ -187,8 +196,8 @@ public class StreamingFeatures {
                 .writeTo(Sinks.mapWithEntryProcessor(STREAMING_FEATURE_MAP,
                     entry -> getJsonObject( entry.getValue()).getString("credit_card_number",""),
                     entry -> new UpdateStreamingFeatureValueProcessor("last_transaction_date", getJsonObject( entry.getValue()).getLong("timestamp_ms",-1L))))
-                .setLocalParallelism(10)
-                .setName("UPDATE - Last Transaction Processed date");
+                .setLocalParallelism(4)
+                .setName("UPDATE - Last Transaction Date");
 
 
         return p;
@@ -251,7 +260,7 @@ public class StreamingFeatures {
                     JsonObject event = new JsonObject(Json.parse(tup.getValue().toString()).asObject());
                     return event.getLong("timestamp_ms",0L);
                     }, MINUTES.toMillis(30))
-                .setLocalParallelism(10);
+                .setLocalParallelism(4);
 
     }
     private static void addSumStreamingFeature(StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, String streamingFeatureMapName, String fieldToSum) {
@@ -262,14 +271,14 @@ public class StreamingFeatures {
                 .aggregate(summingDouble(input -> {
                     return (new JsonObject(Json.parse(input.getValue().toString()).asObject()).getDouble(fieldToSum, 0));
                 }))
-                .setLocalParallelism(10);;
+                .setLocalParallelism(4);
 
         //Update "streaming-features" map with sum amt at every window -- AFTER (with EntryProcessor)
         featureAggregation
                 .writeTo(Sinks.mapWithEntryProcessor(streamingFeatureMapName,
                     entry -> entry.getKey().toString(),
                     entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().doubleValue())))
-                .setLocalParallelism(10)
+                .setLocalParallelism(4)
                 .setName("Update " + featureName);
     }
     private static void addCountStreamingFeature (StreamStage<Map.Entry<Object, Object>> streamSource, String featureName, WindowDefinition windowDefinition, AggregateOperation1 aggregateOperation, String streamingFeatureMapName) {
@@ -278,7 +287,7 @@ public class StreamingFeatures {
                 .groupingKey(Map.Entry::getKey)
                 .window(windowDefinition)
                 .aggregate(aggregateOperation)
-                .setLocalParallelism(10);
+                .setLocalParallelism(4);
 
 
         // Update "streaming-features" map with count at every window - (AFTER With Entry Processor)
@@ -286,7 +295,7 @@ public class StreamingFeatures {
                 .writeTo(Sinks.mapWithEntryProcessor(streamingFeatureMapName,
                         entry -> entry.getKey().toString(),
                         entry -> new UpdateStreamingFeatureValueProcessor(featureName, entry.getValue().longValue())))
-                .setLocalParallelism(10)
+                .setLocalParallelism(4)
                 .setName("Update: " + featureName);
     }
     private static Properties getKafkaBrokerProperties (String bootstrapServers, String clusterKey, String clusterSecret) {

@@ -14,7 +14,7 @@ st.set_page_config(layout="wide")
 @st.cache_resource
 def get_hazelcast_client(cluster_members=['127.0.0.1']):
     ##client = hazelcast.HazelcastClient(**{'cluster_members':cluster_members})
-    client = hazelcast.HazelcastClient(cluster_members=cluster_members, use_public_ip=True,smart_routing=False)
+    client = hazelcast.HazelcastClient(cluster_members=cluster_members, use_public_ip=True,smart_routing=True)
     #run Mapping required to run SQL Queries on JSON objects in predictionResult Map
     client.sql.execute(
         """
@@ -49,8 +49,8 @@ def get_hazelcast_client(cluster_members=['127.0.0.1']):
     client.sql.execute(
         """
         CREATE OR REPLACE MAPPING total_map (
-            __key INTEGER,
-            total_records  DOUBLE,
+            __key INT,
+            total_records  BIGINT,
             total_amount  DOUBLE,
             avg_amount  DOUBLE,
             avg_distance_km DOUBLE
@@ -108,6 +108,15 @@ def get_df(_client, sql_statement, date_cols):
 #@st.cache_data(ttl=30)
 def get_dashboard_totals(fraud_probability_threshold,transaction_amount):
     result = {}
+    result['total_records'] = 0
+    result['total_amount'] = 0
+    result['avg_amount'] = 0
+    result['avg_distance_km'] = 0
+    result['potential_fraud_records'] = 0
+    result['potential_fraud_amount'] = 0
+    result['potential_fraud_per_transaction'] = 0
+    result['avg_distance_in_potential_fraud_transaction'] = 0
+        
     
     #run queries as jobs and store their outputs into total_map
     sql_statement = """
@@ -133,16 +142,18 @@ def get_dashboard_totals(fraud_probability_threshold,transaction_amount):
     total_map = client.get_map("total_map").blocking()
 
     #Get Overall totals
-    res = total_map.get(1).loads()
-    if res:
+    res = total_map.get(1)
+    if total_map and res :
+        res = res.loads();
         result['total_records'] = res['total_records']
         result['total_amount'] = round(float(res['total_amount']),2) if res['total_amount'] else 0
         result['avg_amount'] = round(float(res['avg_amount']),2) if res['avg_amount'] else 0
         result['avg_distance_km'] = round(float(res['avg_distance_km']),2) if res['avg_distance_km'] else 0
     
     #Get fraud totals 
-    res = total_map.get(2).loads()
-    if res:
+    res = total_map.get(2)
+    if total_map and res:
+        res = res.loads()
         result['potential_fraud_records'] = res['total_records'] if res['total_records'] else 0
         result['potential_fraud_amount'] = round(float(res['total_amount']),2) if res['total_amount'] else 0
         result['potential_fraud_per_transaction'] = round(float(res['avg_amount']),2) if res['avg_amount'] else 0
@@ -208,7 +219,7 @@ end_time = time.time()
 
 #Main page title and header
 st.title('Fraud Analysis Dashboard')
-st.header('Most Recent Transactions (300k)','tx_metrics')
+st.header('Most Recent Transactions','tx_metrics')
 
 col1, col2, col3,col4  = st.columns(4)
 with col1:
