@@ -42,8 +42,7 @@ By the end of this demo, you will be able to visualize fraud predictions. This d
 
 # Let's Get Started - Clone this Repo
 ```
-git clone https://github.com/hazelcast/fraud-detection-python.git
-git checkout -b 5.3-kafka
+git clone -b 5.3-kafka https://github.com/hazelcast/fraud-detection-python.git
 cd fraud-detection-python
 ```
 
