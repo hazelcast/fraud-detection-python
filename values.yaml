@@ -41,6 +41,7 @@ hazelcast:
             - type: SORTED
               attributes:
                 - "amount"
+            - type: HASH
               attributes:
                 - "customer_age_group"
             - type: HASH
