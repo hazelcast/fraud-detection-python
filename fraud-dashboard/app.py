@@ -204,7 +204,7 @@ categorical_features = get_categorical_variables()
 #sidebar 
 st.sidebar.header('Transaction Fraud Criteria')
 probability_threshold = st.sidebar.slider('Fraud Probability Above ',50,100,75,1)
-transaction_amount = st.sidebar.slider('Transactions Above (Amount)',100,10000,1000,100)
+transaction_amount = st.sidebar.slider('Transactions Above (Amount)',100,1000,300,100)
 st.sidebar.header('Key Dimensions','key dimensions')
 category_selected = st.sidebar.selectbox('', categorical_features)
 st.sidebar.header('Refresh Settings','refresh')
@@ -257,11 +257,11 @@ sql_statement = """
         avg(distance_from_home) as distance_from_home,sum(amount) as total_amount,
         {category_selected} 
     from predictionResult 
-    where fraud_probability > {fraud_threshold} and amount >= {transaction_amount}
+    where fraud_probability > {fraud_threshold} and amount >= {transaction_amount} and {category_selected}={category_selected}
     group by {category_selected}
-    order by total_transactions DESC
     limit 50
     """.format(category_selected=category_selected,fraud_threshold=fraud_threshold,transaction_amount=transaction_amount)
+#order by total_transactions DESC
 
 #Bubble Chart Dataframe
 bubble_data_cols = ['total_transactions','fraud_probability','distance_from_home','total_amount',category_selected]
@@ -294,15 +294,16 @@ map_sql_statement = """
     select merchant_lat as lat,merchant_lon as lon
     from predictionResult 
     where fraud_probability > {fraud_threshold} and {category_selected} in ({categorical_values}) and amount >= {transaction_amount}
-    order by fraud_probability DESC
     limit 50
     """.format(category_selected=category_selected,categorical_values=categorical_values,fraud_threshold=fraud_threshold,transaction_amount=transaction_amount)
 
-df_map = get_df(client,sql_statement=map_sql_statement,date_cols=[])
+#order by fraud_probability DESC
+#df_map = get_d(client,sql_statement=map_sql_statement,date_cols=[])
+df_map = get_df_3(map_sql_statement,['lat','lon'])
 end_time = time.time()
 
 with col_chart2:
-    st.subheader("Transaction Locations")
+    st.subheader("Unusual Transaction Locations")
     st.write (end_time-start)
     st.map(df_map,use_container_width=False)
     

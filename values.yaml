@@ -29,6 +29,10 @@ hazelcast:
             max-size-policy: PER_NODE
           partition-strategy: com.hazelcast.partition.strategy.StringAndPartitionAwarePartitioningStrategy
           indexes:
+            - attributes:
+              - "fraud_probability"
+              - "amount"
+              - "customer_name"
             - type: HASH
               attributes:
                 - "customer_name"
