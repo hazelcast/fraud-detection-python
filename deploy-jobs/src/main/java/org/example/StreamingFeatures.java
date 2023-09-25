@@ -39,6 +39,9 @@ public class StreamingFeatures {
     private static final String STREAMING_FEATURE_MAP = "streaming-features";
     private static final String PREDICTION_RESULT_MAP = "predictionResult";
 
+    private static String KAFKA_TOPIC = "transactions";
+
+
     public static void main(String[] args) throws Exception {
 
         // get a client connection to Hazelcast
@@ -52,15 +55,18 @@ public class StreamingFeatures {
         String KAFKA_CLUSTER_SECRET = env.get("KAFKA_CLUSTER_SECRET");
         String KAFKA_CLUSTER_ENDPOINT = env.get("KAFKA_ENDPOINT");
         String KAFKA_CLUSTER_TOPIC = env.get("KAFKA_TOPIC");
-        if (KAFKA_CLUSTER_TOPIC==null ||  KAFKA_CLUSTER_TOPIC.isBlank())
+
+        //overwrite KAFKA_TOPIC, if env var has been set
+        if (KAFKA_CLUSTER_TOPIC!=null &&  ! KAFKA_CLUSTER_TOPIC.isBlank())
             //default to transactions
-            KAFKA_CLUSTER_TOPIC="transactions";
+            KAFKA_TOPIC = KAFKA_CLUSTER_TOPIC;
+        System.out.println(KAFKA_TOPIC);
 
 
         Properties kafkaConsumerProperties = getKafkaBrokerProperties(KAFKA_CLUSTER_ENDPOINT,KAFKA_CLUSTER_KEY,KAFKA_CLUSTER_SECRET);
 
         //Job to process transactions and calculate streaming features at the same time
-        Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties,KAFKA_CLUSTER_TOPIC);
+        Pipeline transactionProcessingPipeline = createTransactionProcessingPipeline(kafkaConsumerProperties);
 
         //Submit Jobs to Hazelcast for execution
         submitJob(TRANSACTION_PROCESSING_JOB_NAME,transactionProcessingPipeline,client);
@@ -82,10 +88,10 @@ public class StreamingFeatures {
         //now submit the job
         client.getJet().newJob(pipeline,jobConfig);
     }
-    private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties, String kafkaTopic)  throws Exception {
+    private static Pipeline createTransactionProcessingPipeline(Properties kafkaConsumerProperties)  throws Exception {
         Pipeline p = Pipeline.create();
         // Get stream of Transactions from Kafka Topic
-        StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties,kafkaTopic);
+        StreamStage<Map.Entry<Object, Object>> source = sourceTransactionsFromKafka(p, kafkaConsumerProperties);
 
         //1. Retrieve Current Streaming Feature values from map
         StreamStage<Tuple2<HazelcastJsonValue, JsonObject>> retrieveStreamingFeatures = source
@@ -259,8 +265,8 @@ public class StreamingFeatures {
         return  fraudPredictionRequest;
     }
 
-    private static StreamStage<Map.Entry<Object,Object>> sourceTransactionsFromKafka(Pipeline p, Properties kafkaConsumerProperties, String kafkaTopic) {
-        return p.readFrom(KafkaSources.kafka(kafkaConsumerProperties,kafkaTopic))
+    private static StreamStage<Map.Entry<Object,Object>> sourceTransactionsFromKafka(Pipeline p, Properties kafkaConsumerProperties) {
+        return p.readFrom(KafkaSources.kafka(kafkaConsumerProperties,KAFKA_TOPIC))
                 //Use transaction timestamp
                 .withTimestamps(tup -> {
                     JsonObject event = new JsonObject(Json.parse(tup.getValue().toString()).asObject());
