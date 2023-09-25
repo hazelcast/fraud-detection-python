@@ -52,7 +52,7 @@ public class StreamingFeatures {
         String KAFKA_CLUSTER_SECRET = env.get("KAFKA_CLUSTER_SECRET");
         String KAFKA_CLUSTER_ENDPOINT = env.get("KAFKA_ENDPOINT");
         String KAFKA_CLUSTER_TOPIC = env.get("KAFKA_TOPIC");
-        if (KAFKA_CLUSTER_TOPIC.isBlank())
+        if (KAFKA_CLUSTER_TOPIC==null ||  KAFKA_CLUSTER_TOPIC.isBlank())
             //default to transactions
             KAFKA_CLUSTER_TOPIC="transactions";
 
