@@ -2,7 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/fraud-detection-python.iml" filepath="$PROJECT_DIR$/.idea/fraud-detection-python.iml" />
+      <module fileurl="file://$PROJECT_DIR$/data-loader/data-loader.iml" filepath="$PROJECT_DIR$/data-loader/data-loader.iml" />
+      <module fileurl="file://$PROJECT_DIR$/deploy-jobs/deploy-jobs.iml" filepath="$PROJECT_DIR$/deploy-jobs/deploy-jobs.iml" />
+      <module fileurl="file://$PROJECT_DIR$/fraud-dashboard/fraud-dashboard.iml" filepath="$PROJECT_DIR$/fraud-dashboard/fraud-dashboard.iml" />
     </modules>
   </component>
 </project>

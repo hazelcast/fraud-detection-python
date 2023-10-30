@@ -7,3 +7,4 @@ model-training/.ipynb_checkpoints
 data-loader/data/transaction-stream-full.csv
 deploy-jobs/target/maven-status
 deploy-jobs/target/maven-status/
+/.idea/
