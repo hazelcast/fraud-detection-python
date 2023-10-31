@@ -223,28 +223,28 @@ st.header('Most Recent Transactions','tx_metrics')
 
 col1, col2, col3,col4  = st.columns(4)
 with col1:
-    st.metric('Total Transactions', totals['total_records'],help='SELECT count(*) from predictionResult')
+    st.metric('Total Transactions', '{:,}'.format(totals['total_records']),help='SELECT count(*) from predictionResult')
 with col2:
-    st.metric('Total Amount', totals['total_amount'],help='Total Trasaction Amount')
+    st.metric('Total Amount', '${:,.2f}'.format(totals['total_amount']),help='Total Transaction Amount')
 with col3:
-    st.metric('Avg Amount', totals['avg_amount'],help='Avg Transaction Amount')
+    st.metric('Avg Amount', '${:,.2f}'.format(totals['avg_amount']),help='Avg Transaction Amount')
 with col4:
-    st.metric('Avg Distance (km) from home',totals['avg_distance_km'],help='Distance from home in Km')
+    st.metric('Avg Distance (km) from home','{:,.2f}'.format(totals['avg_distance_km']),help='Distance from home in Km')
 
 #Suspected Fraud Summary
 st.header('Suspected Fraudulent Transactions','tx_fraud_metrics')
 col1_f, col2_f, col3_f,col4_f  = st.columns(4)
 with col1_f:    
-    st.metric('Total Transactions',totals['potential_fraud_records'],help='SELECT count(*) from predictionResult where fraud_probability > ' + str(probability_threshold) + '%')
+    st.metric('Total Transactions','{:,}'.format(totals['potential_fraud_records']),help='SELECT count(*) from predictionResult where fraud_probability > ' + str(probability_threshold) + '%')
 with col2_f:
-    st.metric('Total Amount ', totals['potential_fraud_amount'],help='Total $ Amount of Predicted Fraud in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
+    st.metric('Total Amount ', '${:,}'.format(totals['potential_fraud_amount']),help='Total $ Amount of Predicted Fraud in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
 with col3_f: 
     avg_amount_delta = round(totals['potential_fraud_per_transaction'] - totals['avg_amount'],2)
     
-    st.metric('Avg Amount per Transaction',  totals['potential_fraud_per_transaction'], avg_amount_delta,help='Avg Transaction Amount in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
+    st.metric('Avg Amount per Transaction',  '${:,}'.format(totals['potential_fraud_per_transaction']), '${:,.2f}'.format(avg_amount_delta),help='Avg Transaction Amount in Transactions with Fraud probability >= ' + str(probability_threshold) + '%')
 with col4_f:
     avg_distance_delta = round(totals['avg_distance_in_potential_fraud_transaction'] - totals['avg_distance_km'],2)
-    st.metric('Avg Distance (km) from home', totals['avg_distance_in_potential_fraud_transaction'],avg_distance_delta,help='Distance from home in Km in Transactions with Fraud probability > ' + str(probability_threshold) + '%')
+    st.metric('Avg Distance (km) from home', '{:,}'.format(totals['avg_distance_in_potential_fraud_transaction']),'{:,.2f}'.format(avg_distance_delta),help='Distance from home in Km in Transactions with Fraud probability > ' + str(probability_threshold) + '%')
 
 #Fraud Sources Header
 st.header('Where is Potential Fraud Coming from?','key_dimensions')
